@@ -13,6 +13,8 @@ may import it with a `discord` alias when preferred.
 
 ## Highlights
 
+- High-level application-command router and middleware
+- Pure Go PCM/Opus Voice player and per-SSRC receiver
 - Discord API v10 REST and Gateway bindings
 - Gateway event handling, state tracking, and voice connections
 - DAVE end-to-end voice encryption support
@@ -23,11 +25,48 @@ may import it with a `discord` alias when preferred.
 
 ## Install
 
+discord.go is currently developed as an unpublished fork. After the repository
+is published, install it with:
+
 ```sh
-go get github.com/darui3018823/discord.go@v1.1.0
+go get github.com/darui3018823/discord.go@latest
 ```
 
-Import the package as `dgo`:
+The copied root package is currently named `dgo`. The high-level framework is
+available from the `bot` package:
+
+```go
+import (
+	"context"
+	"os"
+	"os/signal"
+
+	"github.com/darui3018823/discord.go/bot"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	client, err := bot.NewWithToken(os.Getenv("DISCORD_TOKEN"))
+	if err != nil {
+		panic(err)
+	}
+	if err := client.Register(bot.Slash("ping", "Replies with pong", func(ctx *bot.Context) error {
+		return ctx.Reply("Pong!")
+	})); err != nil {
+		panic(err)
+	}
+	if _, err := client.SyncCommands(ctx, os.Getenv("DISCORD_APPLICATION_ID"), ""); err != nil {
+		panic(err)
+	}
+	if err := client.Run(ctx); err != nil {
+		panic(err)
+	}
+}
+```
+
+The low-level API remains available directly:
 
 ```go
 import "github.com/darui3018823/discord.go"
