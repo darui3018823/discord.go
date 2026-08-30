@@ -14,11 +14,22 @@ type Context struct {
 	Session     *dgo.Session
 	Interaction *dgo.Interaction
 	Data        dgo.ApplicationCommandInteractionData
+	// CommandPath contains the selected subcommand path, excluding the
+	// top-level command name. It is empty for a top-level handler.
+	CommandPath []string
+	// Options contains the leaf command options. For a subcommand this omits
+	// the enclosing subcommand and group wrappers.
+	Options []*dgo.ApplicationCommandInteractionDataOption
 }
 
 // Option returns a top-level application-command option by name.
 func (c *Context) Option(name string) *dgo.ApplicationCommandInteractionDataOption {
-	return c.Data.GetOption(name)
+	for _, option := range c.Options {
+		if option != nil && option.Name == name {
+			return option
+		}
+	}
+	return nil
 }
 
 // User returns the user that invoked the command.

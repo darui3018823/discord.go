@@ -20,35 +20,10 @@ var (
 	// ErrInvalidCommand is returned when a command has no definition, name, or
 	// handler.
 	ErrInvalidCommand = errors.New("invalid command")
+	// ErrCommandRouteNotFound is returned when Discord sends an unknown or
+	// malformed subcommand path for a registered top-level command.
+	ErrCommandRouteNotFound = errors.New("command route not found")
 )
-
-// Handler handles one application-command interaction.
-type Handler func(*Context) error
-
-// Middleware wraps a command handler. Middleware is applied in registration
-// order, so the first middleware registered is the outermost wrapper.
-type Middleware func(Handler) Handler
-
-// ErrorHandler receives errors returned by command handlers.
-type ErrorHandler func(*Context, error)
-
-// Command combines the Discord command definition with its local handler.
-type Command struct {
-	Definition *dgo.ApplicationCommand
-	Handler    Handler
-}
-
-// Slash creates a chat-input command.
-func Slash(name, description string, handler Handler) *Command {
-	return &Command{
-		Definition: &dgo.ApplicationCommand{
-			Type:        dgo.ChatApplicationCommand,
-			Name:        name,
-			Description: description,
-		},
-		Handler: handler,
-	}
-}
 
 type commandKey struct {
 	typeID dgo.ApplicationCommandType
@@ -145,7 +120,7 @@ func (b *Bot) Register(commands ...*Command) error {
 
 	seen := make(map[commandKey]struct{}, len(commands))
 	for _, command := range commands {
-		if command == nil || command.Definition == nil || command.Definition.Name == "" || command.Handler == nil {
+		if command == nil || command.Definition == nil || command.Definition.Name == "" || !command.hasHandler() {
 			return ErrInvalidCommand
 		}
 		key := keyFor(command.Definition)
@@ -162,7 +137,7 @@ func (b *Bot) Register(commands ...*Command) error {
 		if command.Definition.Type == 0 {
 			command.Definition.Type = dgo.ChatApplicationCommand
 		}
-		b.commands[keyFor(command.Definition)] = command
+		b.commands[keyFor(command.Definition)] = command.clone()
 	}
 	return nil
 }
@@ -231,14 +206,30 @@ func (b *Bot) Dispatch(ctx context.Context, event *dgo.InteractionCreate) bool {
 		return false
 	}
 
+	path, options, routeErr := resolveCommandRoute(data.Options)
+	handler := command.Handler
+	if len(path) > 0 {
+		handler = command.routes[routeKey(path)]
+	}
+
 	commandContext := &Context{
 		Context:     ctx,
 		Bot:         b,
 		Session:     b.session,
 		Interaction: event.Interaction,
 		Data:        data,
+		CommandPath: append([]string(nil), path...),
+		Options:     options,
 	}
-	handler := command.Handler
+	if routeErr != nil || handler == nil {
+		if errorHandler != nil {
+			if routeErr == nil {
+				routeErr = fmt.Errorf("%w: %s", ErrCommandRouteNotFound, data.Name)
+			}
+			errorHandler(commandContext, routeErr)
+		}
+		return true
+	}
 	for index := len(middleware) - 1; index >= 0; index-- {
 		handler = middleware[index](handler)
 	}
