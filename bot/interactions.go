@@ -177,6 +177,8 @@ func (b *Bot) DispatchInteraction(ctx context.Context, event *dgo.InteractionCre
 	switch event.Type {
 	case dgo.InteractionApplicationCommand:
 		return b.Dispatch(ctx, event)
+	case dgo.InteractionApplicationCommandAutocomplete:
+		return b.dispatchAutocomplete(ctx, event)
 	case dgo.InteractionMessageComponent:
 		return b.dispatchComponent(ctx, event)
 	case dgo.InteractionModalSubmit:

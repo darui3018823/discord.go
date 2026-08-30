@@ -25,27 +25,87 @@ type commandRoute struct {
 	checks       []Check
 	middleware   []Middleware
 	errorHandler ErrorHandler
+	autocomplete map[string]AutocompleteHandler
 }
 
 // Command combines a Discord command definition with local handlers.
 type Command struct {
-	Definition *dgo.ApplicationCommand
-	Handler    Handler
-	Checks     []Check
-	Middleware []Middleware
-	OnError    ErrorHandler
-	routes     map[string]*commandRoute
+	Definition   *dgo.ApplicationCommand
+	Handler      Handler
+	Checks       []Check
+	Middleware   []Middleware
+	OnError      ErrorHandler
+	Autocomplete map[string]AutocompleteHandler
+	routes       map[string]*commandRoute
 }
 
 // Subcommand describes one chat-input subcommand and its leaf options.
 type Subcommand struct {
-	Name        string
-	Description string
-	Options     []*dgo.ApplicationCommandOption
-	Handler     Handler
-	Checks      []Check
-	Middleware  []Middleware
-	OnError     ErrorHandler
+	Name         string
+	Description  string
+	Options      []*dgo.ApplicationCommandOption
+	Handler      Handler
+	Checks       []Check
+	Middleware   []Middleware
+	OnError      ErrorHandler
+	Autocomplete map[string]AutocompleteHandler
+}
+
+// SetAutocomplete associates a top-level option with an autocomplete handler
+// and enables autocomplete in its Discord definition.
+func (c *Command) SetAutocomplete(optionName string, handler AutocompleteHandler) error {
+	if handler == nil {
+		return fmt.Errorf("%w: nil autocomplete handler", ErrInvalidCommand)
+	}
+	if err := enableAutocomplete(c.Definition.Options, optionName); err != nil {
+		return err
+	}
+	if c.Autocomplete == nil {
+		c.Autocomplete = make(map[string]AutocompleteHandler)
+	}
+	if _, exists := c.Autocomplete[optionName]; exists {
+		return fmt.Errorf("%w: duplicate autocomplete option %q", ErrInvalidCommand, optionName)
+	}
+	c.Autocomplete[optionName] = handler
+	return nil
+}
+
+// SetAutocomplete associates a leaf subcommand option with an autocomplete
+// handler and enables autocomplete in its Discord definition.
+func (s *Subcommand) SetAutocomplete(optionName string, handler AutocompleteHandler) error {
+	if handler == nil {
+		return fmt.Errorf("%w: nil autocomplete handler", ErrInvalidCommand)
+	}
+	if err := enableAutocomplete(s.Options, optionName); err != nil {
+		return err
+	}
+	if s.Autocomplete == nil {
+		s.Autocomplete = make(map[string]AutocompleteHandler)
+	}
+	if _, exists := s.Autocomplete[optionName]; exists {
+		return fmt.Errorf("%w: duplicate autocomplete option %q", ErrInvalidCommand, optionName)
+	}
+	s.Autocomplete[optionName] = handler
+	return nil
+}
+
+func enableAutocomplete(options []*dgo.ApplicationCommandOption, optionName string) error {
+	for _, option := range options {
+		if option == nil || option.Name != optionName {
+			continue
+		}
+		switch option.Type {
+		case dgo.ApplicationCommandOptionString, dgo.ApplicationCommandOptionInteger, dgo.ApplicationCommandOptionNumber:
+			if len(option.Choices) > 0 {
+				return fmt.Errorf("%w: autocomplete and choices are mutually exclusive for %q", ErrInvalidCommand, optionName)
+			}
+			option.Autocomplete = true
+			return nil
+		default:
+			return fmt.Errorf("%w: option %q does not support autocomplete", ErrInvalidCommand, optionName)
+		}
+	}
+	return fmt.Errorf("%w: autocomplete option %q not found", ErrInvalidCommand, optionName)
 }
 
 // Sub creates a chat-input subcommand.
@@ -271,11 +331,12 @@ func (c *Command) hasHandler() bool {
 
 func (c *Command) clone() *Command {
 	copyCommand := &Command{
-		Handler:    c.Handler,
-		Checks:     append([]Check(nil), c.Checks...),
-		Middleware: append([]Middleware(nil), c.Middleware...),
-		OnError:    c.OnError,
-		routes:     make(map[string]*commandRoute, len(c.routes)),
+		Handler:      c.Handler,
+		Checks:       append([]Check(nil), c.Checks...),
+		Middleware:   append([]Middleware(nil), c.Middleware...),
+		OnError:      c.OnError,
+		Autocomplete: cloneAutocomplete(c.Autocomplete),
+		routes:       make(map[string]*commandRoute, len(c.routes)),
 	}
 	if c.Definition != nil {
 		definition := *c.Definition
@@ -291,6 +352,7 @@ func (c *Command) clone() *Command {
 			checks:       append([]Check(nil), route.checks...),
 			middleware:   append([]Middleware(nil), route.middleware...),
 			errorHandler: route.errorHandler,
+			autocomplete: cloneAutocomplete(route.autocomplete),
 		}
 	}
 	return copyCommand
@@ -302,7 +364,19 @@ func routeFor(command *Subcommand) *commandRoute {
 		checks:       append([]Check(nil), command.Checks...),
 		middleware:   append([]Middleware(nil), command.Middleware...),
 		errorHandler: command.OnError,
+		autocomplete: cloneAutocomplete(command.Autocomplete),
 	}
+}
+
+func cloneAutocomplete(source map[string]AutocompleteHandler) map[string]AutocompleteHandler {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]AutocompleteHandler, len(source))
+	for option, handler := range source {
+		cloned[option] = handler
+	}
+	return cloned
 }
 
 func cloneOptions(options []*dgo.ApplicationCommandOption) []*dgo.ApplicationCommandOption {
