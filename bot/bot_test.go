@@ -23,9 +23,14 @@ func newTestBot(t *testing.T) *Bot {
 		framework.mu.Lock()
 		remove := framework.removeEvent
 		framework.removeEvent = nil
+		removeMessage := framework.removeMessageEvent
+		framework.removeMessageEvent = nil
 		framework.mu.Unlock()
 		if remove != nil {
 			remove()
+		}
+		if removeMessage != nil {
+			removeMessage()
 		}
 	})
 	return framework

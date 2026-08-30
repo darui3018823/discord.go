@@ -51,6 +51,12 @@ type Bot struct {
 	components             customRouter[ComponentHandler]
 	modals                 customRouter[ModalHandler]
 	removeEvent            func()
+	prefixes               []string
+	prefixCommands         map[string]*PrefixCommand
+	prefixChecks           []PrefixCheck
+	prefixMiddleware       []PrefixMiddleware
+	prefixErrorHandle      PrefixErrorHandler
+	removeMessageEvent     func()
 }
 
 // AddChecks registers global checks that run before every command.
@@ -71,10 +77,11 @@ func New(session *dgo.Session) (*Bot, error) {
 	}
 
 	b := &Bot{
-		session:    session,
-		commands:   make(map[commandKey]*Command),
-		components: newCustomRouter[ComponentHandler](),
-		modals:     newCustomRouter[ModalHandler](),
+		session:        session,
+		commands:       make(map[commandKey]*Command),
+		components:     newCustomRouter[ComponentHandler](),
+		modals:         newCustomRouter[ModalHandler](),
+		prefixCommands: make(map[string]*PrefixCommand),
 	}
 	b.errorHandle = func(ctx *Context, err error) {
 		slog.Default().Error("discord command failed",
@@ -89,8 +96,12 @@ func New(session *dgo.Session) (*Bot, error) {
 			"error", err,
 		)
 	}
+	b.prefixErrorHandle = defaultPrefixErrorHandler
 	b.removeEvent = session.AddHandler(func(_ *dgo.Session, event *dgo.InteractionCreate) {
 		b.DispatchInteraction(context.Background(), event)
+	})
+	b.removeMessageEvent = session.AddHandler(func(_ *dgo.Session, event *dgo.MessageCreate) {
+		b.DispatchMessage(context.Background(), event)
 	})
 	return b, nil
 }
@@ -366,9 +377,14 @@ func (b *Bot) Close() error {
 	b.mu.Lock()
 	remove := b.removeEvent
 	b.removeEvent = nil
+	removeMessage := b.removeMessageEvent
+	b.removeMessageEvent = nil
 	b.mu.Unlock()
 	if remove != nil {
 		remove()
+	}
+	if removeMessage != nil {
+		removeMessage()
 	}
 	return b.session.Close()
 }
