@@ -58,7 +58,14 @@ type Bot struct {
 	prefixErrorHandle      PrefixErrorHandler
 	removeMessageEvent     func()
 	extensions             map[string]*loadedExtension
+	loops                  map[*Loop]struct{}
+	reservedLoops          map[*Loop]struct{}
+	lifecycleCtx           context.Context
+	lifecycleCancel        context.CancelCauseFunc
 	closed                 bool
+	closeStarted           bool
+	closeDone              chan struct{}
+	closeErr               error
 }
 
 // AddChecks registers global checks that run before every command.
@@ -78,13 +85,18 @@ func New(session *dgo.Session) (*Bot, error) {
 		return nil, errors.New("session must not be nil")
 	}
 
+	lifecycleCtx, lifecycleCancel := context.WithCancelCause(context.Background())
 	b := &Bot{
-		session:        session,
-		commands:       make(map[commandKey]*Command),
-		components:     newCustomRouter[ComponentHandler](),
-		modals:         newCustomRouter[ModalHandler](),
-		prefixCommands: make(map[string]*PrefixCommand),
-		extensions:     make(map[string]*loadedExtension),
+		session:         session,
+		commands:        make(map[commandKey]*Command),
+		components:      newCustomRouter[ComponentHandler](),
+		modals:          newCustomRouter[ModalHandler](),
+		prefixCommands:  make(map[string]*PrefixCommand),
+		extensions:      make(map[string]*loadedExtension),
+		loops:           make(map[*Loop]struct{}),
+		reservedLoops:   make(map[*Loop]struct{}),
+		lifecycleCtx:    lifecycleCtx,
+		lifecycleCancel: lifecycleCancel,
 	}
 	b.errorHandle = func(ctx *Context, err error) {
 		slog.Default().Error("discord command failed",
@@ -375,10 +387,36 @@ func (b *Bot) Run(ctx context.Context) error {
 	return b.Close()
 }
 
-// Close detaches the router and closes the underlying Session.
+// Close gracefully stops managed resources and closes the underlying Session.
 func (b *Bot) Close() error {
+	return b.CloseContext(context.Background())
+}
+
+// CloseContext gracefully stops extensions and task loops, detaches the
+// router, and closes the underlying Session. If ctx expires, active loop
+// iterations are cancelled and shutdown continues.
+func (b *Bot) CloseContext(ctx context.Context) error {
+	if ctx == nil {
+		return errors.New("context must not be nil")
+	}
 	b.mu.Lock()
+	if b.closeStarted {
+		done := b.closeDone
+		b.mu.Unlock()
+		select {
+		case <-done:
+			b.mu.RLock()
+			err := b.closeErr
+			b.mu.RUnlock()
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	b.closeStarted = true
 	b.closed = true
+	b.closeDone = make(chan struct{})
+	closeDone := b.closeDone
 	extensionNames := make([]string, 0, len(b.extensions))
 	for name := range b.extensions {
 		extensionNames = append(extensionNames, name)
@@ -387,14 +425,27 @@ func (b *Bot) Close() error {
 	b.removeEvent = nil
 	removeMessage := b.removeMessageEvent
 	b.removeMessageEvent = nil
+	loops := make([]*Loop, 0, len(b.loops))
+	for loop := range b.loops {
+		loops = append(loops, loop)
+	}
 	b.mu.Unlock()
 	sort.Strings(extensionNames)
 	var closeErrors []error
 	for _, name := range extensionNames {
-		if err := b.UnloadExtension(context.Background(), name); err != nil && !errors.Is(err, ErrExtensionNotLoaded) {
+		if err := b.UnloadExtension(ctx, name); err != nil && !errors.Is(err, ErrExtensionNotLoaded) {
 			closeErrors = append(closeErrors, err)
 		}
 	}
+	for _, loop := range loops {
+		if err := loop.Stop(ctx); err != nil && !errors.Is(err, ErrLoopNotRunning) {
+			closeErrors = append(closeErrors, err)
+			if loop.IsRunning() {
+				_ = loop.Cancel(ErrBotClosed)
+			}
+		}
+	}
+	b.lifecycleCancel(ErrBotClosed)
 	if remove != nil {
 		remove()
 	}
@@ -404,5 +455,10 @@ func (b *Bot) Close() error {
 	if err := b.session.Close(); err != nil {
 		closeErrors = append(closeErrors, err)
 	}
-	return errors.Join(closeErrors...)
+	result := errors.Join(closeErrors...)
+	b.mu.Lock()
+	b.closeErr = result
+	close(closeDone)
+	b.mu.Unlock()
+	return result
 }

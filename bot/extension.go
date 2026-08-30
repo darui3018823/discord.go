@@ -16,6 +16,9 @@ var (
 	ErrExtensionLoaded = errors.New("extension is already loaded")
 	// ErrExtensionNotLoaded is returned when unloading an unknown extension.
 	ErrExtensionNotLoaded = errors.New("extension is not loaded")
+	// ErrExtensionUnloaded is used as the cancellation cause when an extension
+	// loop cannot finish before its unload deadline.
+	ErrExtensionUnloaded = errors.New("extension was unloaded")
 	// ErrInvalidExtension is returned for nil or unnamed extensions.
 	ErrInvalidExtension = errors.New("invalid extension")
 	// ErrBotClosed is returned when an extension is loaded after Close.
@@ -81,6 +84,7 @@ type ExtensionRegistrar struct {
 	components []interactionRegistration[ComponentHandler]
 	modals     []interactionRegistration[ModalHandler]
 	events     []any
+	loops      []*Loop
 }
 
 // Bot returns the host Bot for dependency access during Setup.
@@ -154,6 +158,18 @@ func (r *ExtensionRegistrar) AddEventHandler(handler any) error {
 	return nil
 }
 
+// AddLoops stages task loops that start only after every extension
+// registration has passed conflict validation.
+func (r *ExtensionRegistrar) AddLoops(loops ...*Loop) error {
+	for _, loop := range loops {
+		if loop == nil {
+			return ErrInvalidLoop
+		}
+	}
+	r.loops = append(r.loops, loops...)
+	return nil
+}
+
 type loadedExtension struct {
 	name             string
 	extension        Extension
@@ -162,6 +178,7 @@ type loadedExtension struct {
 	componentRoutes  []interactionRegistration[ComponentHandler]
 	modalRoutes      []interactionRegistration[ModalHandler]
 	removeEventHooks []func()
+	loops            []*Loop
 }
 
 // LoadExtension runs Setup and atomically publishes every staged registry
@@ -262,6 +279,21 @@ func (b *Bot) commitExtension(name string, extension Extension, registrar *Exten
 			return err
 		}
 	}
+	preparedLoops := make([]*preparedLoopRun, 0, len(registrar.loops))
+	for _, loop := range registrar.loops {
+		_, managed := b.loops[loop]
+		_, reserved := b.reservedLoops[loop]
+		if managed || reserved {
+			abortPreparedLoopRuns(preparedLoops, ErrLoopManaged)
+			return ErrLoopManaged
+		}
+		prepared, err := loop.prepareStart(b.lifecycleCtx)
+		if err != nil {
+			abortPreparedLoopRuns(preparedLoops, err)
+			return err
+		}
+		preparedLoops = append(preparedLoops, prepared)
+	}
 
 	removeHooks := make([]func(), 0, len(registrar.events))
 	for _, handler := range registrar.events {
@@ -271,12 +303,21 @@ func (b *Bot) commitExtension(name string, extension Extension, registrar *Exten
 	b.prefixCommands = prefixCommands
 	b.components = components
 	b.modals = modals
+	for _, loop := range registrar.loops {
+		b.loops[loop] = struct{}{}
+		b.reservedLoops[loop] = struct{}{}
+	}
 	b.extensions[name] = &loadedExtension{
 		name: name, extension: extension, commands: ownedCommandKeys,
 		prefixCommands:   ownedPrefix,
 		componentRoutes:  append([]interactionRegistration[ComponentHandler](nil), registrar.components...),
 		modalRoutes:      append([]interactionRegistration[ModalHandler](nil), registrar.modals...),
 		removeEventHooks: removeHooks,
+		loops:            append([]*Loop(nil), registrar.loops...),
+	}
+	for _, prepared := range preparedLoops {
+		prepared.launch()
+		go b.watchLoop(prepared.loop)
 	}
 	return nil
 }
@@ -310,14 +351,30 @@ func (b *Bot) UnloadExtension(ctx context.Context, name string) error {
 	for _, route := range loaded.modalRoutes {
 		b.modals.remove(route.pattern, route.prefix)
 	}
+	for _, loop := range loaded.loops {
+		delete(b.loops, loop)
+		delete(b.reservedLoops, loop)
+	}
 	b.mu.Unlock()
 
+	var unloadErrors []error
 	for _, remove := range loaded.removeEventHooks {
 		if remove != nil {
 			remove()
 		}
 	}
-	return invokeExtensionTeardown(ctx, loaded.extension)
+	for _, loop := range loaded.loops {
+		if err := loop.Stop(ctx); err != nil && !errors.Is(err, ErrLoopNotRunning) {
+			unloadErrors = append(unloadErrors, err)
+			if loop.IsRunning() {
+				_ = loop.Cancel(ErrExtensionUnloaded)
+			}
+		}
+	}
+	if err := invokeExtensionTeardown(ctx, loaded.extension); err != nil {
+		unloadErrors = append(unloadErrors, err)
+	}
+	return errors.Join(unloadErrors...)
 }
 
 // UnloadCog is an alias for UnloadExtension.
@@ -381,4 +438,10 @@ func abortExtension(ctx context.Context, extension Extension, cause error) error
 		return errors.Join(cause, cleanupErr)
 	}
 	return cause
+}
+
+func abortPreparedLoopRuns(runs []*preparedLoopRun, cause error) {
+	for _, run := range runs {
+		run.abort(cause)
+	}
 }

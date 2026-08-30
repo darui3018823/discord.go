@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	dgo "github.com/darui3018823/discord.go"
 )
@@ -183,5 +184,92 @@ func TestExtensionTeardownErrorDoesNotKeepRegistrations(t *testing.T) {
 	}
 	if framework.Dispatch(context.Background(), interaction("cleanup", dgo.ChatApplicationCommand)) {
 		t.Fatal("route remained registered after a teardown error")
+	}
+}
+
+func TestExtensionOwnsTaskLoops(t *testing.T) {
+	framework := newTestBot(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	loop, err := NewLoop(time.Hour, func(context.Context) error {
+		close(started)
+		<-release
+		return nil
+	}, WithLoopName("extension-worker"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	extension := NewExtension("tasks", func(_ context.Context, registrar *ExtensionRegistrar) error {
+		return registrar.AddLoops(loop)
+	})
+	if err := framework.LoadExtension(context.Background(), extension); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	unloaded := make(chan error, 1)
+	go func() { unloaded <- framework.UnloadExtension(context.Background(), "tasks") }()
+	select {
+	case err := <-unloaded:
+		t.Fatalf("UnloadExtension returned before its task completed: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(release)
+	if err := <-unloaded; err != nil {
+		t.Fatal(err)
+	}
+	if loop.IsRunning() || len(framework.Loops()) != 0 {
+		t.Fatalf("extension loop remained managed: running=%v loops=%v", loop.IsRunning(), framework.Loops())
+	}
+}
+
+func TestExtensionLoopConflictRollsBackTransaction(t *testing.T) {
+	framework := newTestBot(t)
+	loop, err := NewLoop(time.Hour, func(context.Context) error { return nil }, WithImmediate(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	extension := NewExtension("duplicate-loop", func(_ context.Context, registrar *ExtensionRegistrar) error {
+		if err := registrar.AddCommands(Slash("temporary-loop", "Temporary", func(*Context) error { return nil })); err != nil {
+			return err
+		}
+		return registrar.AddLoops(loop, loop)
+	})
+	if err := framework.LoadExtension(context.Background(), extension); !errors.Is(err, ErrLoopRunning) {
+		t.Fatalf("LoadExtension error = %v", err)
+	}
+	if framework.Dispatch(context.Background(), interaction("temporary-loop", dgo.ChatApplicationCommand)) {
+		t.Fatal("command was published from a rejected loop transaction")
+	}
+	if loop.IsRunning() {
+		t.Fatal("prepared loop remained running after transaction rollback")
+	}
+	if err := loop.Wait(context.Background()); !errors.Is(err, ErrLoopNotRunning) {
+		t.Fatalf("rolled-back loop state was not restored: %v", err)
+	}
+}
+
+func TestCompletedExtensionLoopRemainsOwnedUntilUnload(t *testing.T) {
+	framework := newTestBot(t)
+	loop, err := NewLoop(time.Millisecond, func(context.Context) error { return nil }, WithLoopCount(1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	extension := NewExtension("short-task", func(_ context.Context, registrar *ExtensionRegistrar) error {
+		return registrar.AddLoops(loop)
+	})
+	if err := framework.LoadExtension(context.Background(), extension); err != nil {
+		t.Fatal(err)
+	}
+	if err := loop.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StartLoop(loop); !errors.Is(err, ErrLoopManaged) {
+		t.Fatalf("restart of owned loop error = %v", err)
+	}
+	if err := framework.UnloadExtension(context.Background(), "short-task"); err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StartLoop(loop); err != nil {
+		t.Fatalf("restart after unload: %v", err)
 	}
 }

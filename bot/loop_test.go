@@ -209,3 +209,98 @@ func TestLoopValidationAndWaitTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBotManagesLoopLifecycle(t *testing.T) {
+	framework := newTestBot(t)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	loop, err := NewLoop(time.Hour, func(context.Context) error {
+		close(started)
+		<-release
+		return nil
+	}, WithLoopName("managed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StartLoop(loop); err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StartLoop(loop); !errors.Is(err, ErrLoopManaged) {
+		t.Fatalf("second StartLoop error = %v", err)
+	}
+	if got := framework.Loops(); len(got) != 1 || got[0] != loop {
+		t.Fatalf("Loops = %v", got)
+	}
+	<-started
+	closed := make(chan error, 1)
+	go func() { closed <- framework.CloseContext(context.Background()) }()
+	select {
+	case err := <-closed:
+		t.Fatalf("CloseContext returned before current task completed: %v", err)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(release)
+	if err := <-closed; err != nil {
+		t.Fatal(err)
+	}
+	if loop.IsRunning() {
+		t.Fatal("managed loop remained active after CloseContext")
+	}
+	if err := framework.StartLoop(loop); !errors.Is(err, ErrBotClosed) {
+		t.Fatalf("StartLoop after close error = %v", err)
+	}
+}
+
+func TestBotCloseDeadlineCancelsManagedLoop(t *testing.T) {
+	framework := newTestBot(t)
+	started := make(chan struct{})
+	finished := make(chan struct{})
+	loop, err := NewLoop(time.Hour, func(ctx context.Context) error {
+		close(started)
+		<-ctx.Done()
+		return context.Cause(ctx)
+	}, WithAfterLoop(func(context.Context, error) error {
+		close(finished)
+		return nil
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StartLoop(loop); err != nil {
+		t.Fatal(err)
+	}
+	<-started
+	closeCtx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	if err := framework.CloseContext(closeCtx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("CloseContext error = %v", err)
+	}
+	select {
+	case <-finished:
+	case <-time.After(time.Second):
+		t.Fatal("loop did not observe forced cancellation")
+	}
+	if err := loop.LastError(); !errors.Is(err, ErrBotClosed) {
+		t.Fatalf("loop cancellation cause = %v", err)
+	}
+}
+
+func TestBotStopLoopReleasesOwnership(t *testing.T) {
+	framework := newTestBot(t)
+	loop, err := NewLoop(time.Hour, func(context.Context) error { return nil }, WithImmediate(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StopLoop(context.Background(), loop); !errors.Is(err, ErrLoopNotManaged) {
+		t.Fatalf("unmanaged StopLoop error = %v", err)
+	}
+	if err := framework.StartLoop(loop); err != nil {
+		t.Fatal(err)
+	}
+	if err := framework.StopLoop(context.Background(), loop); err != nil {
+		t.Fatal(err)
+	}
+	if len(framework.Loops()) != 0 {
+		t.Fatalf("Loops after StopLoop = %v", framework.Loops())
+	}
+}

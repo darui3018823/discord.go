@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
@@ -15,6 +16,10 @@ var (
 	ErrLoopRunning = errors.New("task loop is already running")
 	// ErrLoopNotRunning is returned when an operation requires an active loop.
 	ErrLoopNotRunning = errors.New("task loop is not running")
+	// ErrLoopManaged is returned when a Bot already owns a loop.
+	ErrLoopManaged = errors.New("task loop is already managed")
+	// ErrLoopNotManaged is returned when a Bot does not own a loop.
+	ErrLoopNotManaged = errors.New("task loop is not managed")
 	errLoopStopped    = errors.New("task loop stopped")
 )
 
@@ -151,16 +156,50 @@ func WithContinueOnError(continueOnError bool) LoopOption {
 
 // Start begins the loop in a goroutine.
 func (l *Loop) Start(parent context.Context) error {
-	if l == nil || parent == nil {
-		return ErrInvalidLoop
-	}
-	if err := parent.Err(); err != nil {
+	prepared, err := l.prepareStart(parent)
+	if err != nil {
 		return err
 	}
+	prepared.launch()
+	return nil
+}
+
+type preparedLoopRun struct {
+	loop               *Loop
+	ctx                context.Context
+	stop               <-chan struct{}
+	wake               <-chan struct{}
+	done               chan struct{}
+	previousHasRun     bool
+	previousIterations uint64
+	previousLastErr    error
+	previousNextRun    time.Time
+	previousStop       chan struct{}
+	previousWake       chan struct{}
+	previousDone       chan struct{}
+}
+
+func (l *Loop) prepareStart(parent context.Context) (*preparedLoopRun, error) {
+	if l == nil || parent == nil {
+		return nil, ErrInvalidLoop
+	}
+	if err := parent.Err(); err != nil {
+		return nil, err
+	}
 	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.running {
-		l.mu.Unlock()
-		return ErrLoopRunning
+		return nil, ErrLoopRunning
+	}
+	prepared := &preparedLoopRun{
+		loop:               l,
+		previousHasRun:     l.hasRun,
+		previousIterations: l.iterations,
+		previousLastErr:    l.lastErr,
+		previousNextRun:    l.nextRun,
+		previousStop:       l.stop,
+		previousWake:       l.wake,
+		previousDone:       l.done,
 	}
 	runCtx, cancel := context.WithCancelCause(parent)
 	l.running = true
@@ -173,13 +212,38 @@ func (l *Loop) Start(parent context.Context) error {
 	l.stop = make(chan struct{})
 	l.wake = make(chan struct{}, 1)
 	l.done = make(chan struct{})
-	stop := l.stop
-	wake := l.wake
-	done := l.done
-	l.mu.Unlock()
+	prepared.ctx = runCtx
+	prepared.stop = l.stop
+	prepared.wake = l.wake
+	prepared.done = l.done
+	return prepared, nil
+}
 
-	go l.execute(runCtx, stop, wake, done)
-	return nil
+func (run *preparedLoopRun) launch() {
+	go run.loop.execute(run.ctx, run.stop, run.wake, run.done)
+}
+
+func (run *preparedLoopRun) abort(cause error) {
+	loop := run.loop
+	loop.mu.Lock()
+	if loop.done != run.done || !loop.running {
+		loop.mu.Unlock()
+		return
+	}
+	cancel := loop.cancel
+	loop.hasRun = run.previousHasRun
+	loop.iterations = run.previousIterations
+	loop.lastErr = run.previousLastErr
+	loop.running = false
+	loop.stopping = false
+	loop.nextRun = run.previousNextRun
+	loop.cancel = nil
+	loop.stop = run.previousStop
+	loop.wake = run.previousWake
+	loop.done = run.previousDone
+	close(run.done)
+	loop.mu.Unlock()
+	cancel(cause)
 }
 
 // Run starts the loop and blocks until it exits or the waiting context ends.
@@ -333,6 +397,74 @@ func (l *Loop) LastError() error {
 	return l.lastErr
 }
 
+// StartLoop starts a loop under the Bot lifecycle. Managed loops are stopped
+// by CloseContext and cancelled if its shutdown deadline expires.
+func (b *Bot) StartLoop(loop *Loop) error {
+	if loop == nil {
+		return ErrInvalidLoop
+	}
+	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return ErrBotClosed
+	}
+	if _, exists := b.loops[loop]; exists {
+		b.mu.Unlock()
+		return ErrLoopManaged
+	}
+	if _, reserved := b.reservedLoops[loop]; reserved {
+		b.mu.Unlock()
+		return ErrLoopManaged
+	}
+	if err := loop.Start(b.lifecycleCtx); err != nil {
+		b.mu.Unlock()
+		return err
+	}
+	b.loops[loop] = struct{}{}
+	b.mu.Unlock()
+	go b.watchLoop(loop)
+	return nil
+}
+
+// StopLoop gracefully stops and releases a managed loop.
+func (b *Bot) StopLoop(ctx context.Context, loop *Loop) error {
+	if ctx == nil || loop == nil {
+		return ErrInvalidLoop
+	}
+	b.mu.RLock()
+	_, exists := b.loops[loop]
+	b.mu.RUnlock()
+	if !exists {
+		return ErrLoopNotManaged
+	}
+	err := loop.Stop(ctx)
+	if !loop.IsRunning() {
+		b.mu.Lock()
+		delete(b.loops, loop)
+		b.mu.Unlock()
+	}
+	return err
+}
+
+// Loops returns the task loops currently managed by the Bot.
+func (b *Bot) Loops() []*Loop {
+	b.mu.RLock()
+	loops := make([]*Loop, 0, len(b.loops))
+	for loop := range b.loops {
+		loops = append(loops, loop)
+	}
+	b.mu.RUnlock()
+	sort.Slice(loops, func(i, j int) bool { return loops[i].Name() < loops[j].Name() })
+	return loops
+}
+
+func (b *Bot) watchLoop(loop *Loop) {
+	_ = loop.Wait(context.Background())
+	b.mu.Lock()
+	delete(b.loops, loop)
+	b.mu.Unlock()
+}
+
 func (l *Loop) execute(ctx context.Context, stop <-chan struct{}, wake <-chan struct{}, done chan struct{}) {
 	result := l.run(ctx, stop, wake)
 	cleanupCtx := context.WithoutCancel(ctx)
@@ -343,6 +475,7 @@ func (l *Loop) execute(ctx context.Context, stop <-chan struct{}, wake <-chan st
 	}
 
 	l.mu.Lock()
+	cancel := l.cancel
 	l.lastErr = result
 	l.running = false
 	l.stopping = false
@@ -350,6 +483,7 @@ func (l *Loop) execute(ctx context.Context, stop <-chan struct{}, wake <-chan st
 	l.cancel = nil
 	close(done)
 	l.mu.Unlock()
+	cancel(nil)
 }
 
 func (l *Loop) run(ctx context.Context, stop <-chan struct{}, wake <-chan struct{}) error {
