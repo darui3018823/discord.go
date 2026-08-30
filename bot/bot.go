@@ -42,12 +42,15 @@ func keyFor(definition *dgo.ApplicationCommand) commandKey {
 type Bot struct {
 	session *dgo.Session
 
-	mu          sync.RWMutex
-	commands    map[commandKey]*Command
-	checks      []Check
-	middleware  []Middleware
-	errorHandle ErrorHandler
-	removeEvent func()
+	mu                     sync.RWMutex
+	commands               map[commandKey]*Command
+	checks                 []Check
+	middleware             []Middleware
+	errorHandle            ErrorHandler
+	interactionErrorHandle InteractionErrorHandler
+	components             customRouter[ComponentHandler]
+	modals                 customRouter[ModalHandler]
+	removeEvent            func()
 }
 
 // AddChecks registers global checks that run before every command.
@@ -68,8 +71,10 @@ func New(session *dgo.Session) (*Bot, error) {
 	}
 
 	b := &Bot{
-		session:  session,
-		commands: make(map[commandKey]*Command),
+		session:    session,
+		commands:   make(map[commandKey]*Command),
+		components: newCustomRouter[ComponentHandler](),
+		modals:     newCustomRouter[ModalHandler](),
 	}
 	b.errorHandle = func(ctx *Context, err error) {
 		slog.Default().Error("discord command failed",
@@ -77,8 +82,15 @@ func New(session *dgo.Session) (*Bot, error) {
 			"error", err,
 		)
 	}
+	b.interactionErrorHandle = func(ctx *InteractionContext, err error) {
+		slog.Default().Error("discord interaction failed",
+			"type", ctx.Interaction.Type,
+			"custom_id", ctx.CustomID,
+			"error", err,
+		)
+	}
 	b.removeEvent = session.AddHandler(func(_ *dgo.Session, event *dgo.InteractionCreate) {
-		b.Dispatch(context.Background(), event)
+		b.DispatchInteraction(context.Background(), event)
 	})
 	return b, nil
 }
