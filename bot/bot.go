@@ -57,6 +57,8 @@ type Bot struct {
 	prefixMiddleware       []PrefixMiddleware
 	prefixErrorHandle      PrefixErrorHandler
 	removeMessageEvent     func()
+	extensions             map[string]*loadedExtension
+	closed                 bool
 }
 
 // AddChecks registers global checks that run before every command.
@@ -82,6 +84,7 @@ func New(session *dgo.Session) (*Bot, error) {
 		components:     newCustomRouter[ComponentHandler](),
 		modals:         newCustomRouter[ModalHandler](),
 		prefixCommands: make(map[string]*PrefixCommand),
+		extensions:     make(map[string]*loadedExtension),
 	}
 	b.errorHandle = func(ctx *Context, err error) {
 		slog.Default().Error("discord command failed",
@@ -369,22 +372,37 @@ func (b *Bot) Run(ctx context.Context) error {
 		return err
 	}
 	<-ctx.Done()
-	return b.session.Close()
+	return b.Close()
 }
 
 // Close detaches the router and closes the underlying Session.
 func (b *Bot) Close() error {
 	b.mu.Lock()
+	b.closed = true
+	extensionNames := make([]string, 0, len(b.extensions))
+	for name := range b.extensions {
+		extensionNames = append(extensionNames, name)
+	}
 	remove := b.removeEvent
 	b.removeEvent = nil
 	removeMessage := b.removeMessageEvent
 	b.removeMessageEvent = nil
 	b.mu.Unlock()
+	sort.Strings(extensionNames)
+	var closeErrors []error
+	for _, name := range extensionNames {
+		if err := b.UnloadExtension(context.Background(), name); err != nil && !errors.Is(err, ErrExtensionNotLoaded) {
+			closeErrors = append(closeErrors, err)
+		}
+	}
 	if remove != nil {
 		remove()
 	}
 	if removeMessage != nil {
 		removeMessage()
 	}
-	return b.session.Close()
+	if err := b.session.Close(); err != nil {
+		closeErrors = append(closeErrors, err)
+	}
+	return errors.Join(closeErrors...)
 }

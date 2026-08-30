@@ -109,6 +109,28 @@ func (r *customRouter[H]) match(customID string) (handler H, pattern, suffix str
 	return handler, "", "", false
 }
 
+func (r customRouter[H]) clone() customRouter[H] {
+	cloned := newCustomRouter[H]()
+	for pattern, handler := range r.exact {
+		cloned.exact[pattern] = handler
+	}
+	cloned.prefixes = append([]customRoute[H](nil), r.prefixes...)
+	return cloned
+}
+
+func (r *customRouter[H]) remove(pattern string, prefix bool) {
+	if !prefix {
+		delete(r.exact, pattern)
+		return
+	}
+	for index, route := range r.prefixes {
+		if route.pattern == pattern {
+			r.prefixes = append(r.prefixes[:index], r.prefixes[index+1:]...)
+			return
+		}
+	}
+}
+
 // SetInteractionErrorHandler replaces the component/modal error handler.
 // Passing nil restores structured logging.
 func (b *Bot) SetInteractionErrorHandler(handler InteractionErrorHandler) {
