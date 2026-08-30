@@ -67,6 +67,7 @@ type VoiceConnection struct {
 	close chan struct{}
 
 	generationCounter uint64
+	audioGeneration   uint64
 	generation        *voiceWebsocketGeneration
 	resumeAttempts    int
 
@@ -162,6 +163,16 @@ func (v *VoiceConnection) Metrics() VoiceConnectionMetrics {
 		MalformedRTPPackets:            v.malformedRTPPackets.Load(),
 		ConsecutiveDAVEEncryptFailures: v.daveEncryptFailureStreak.Load(),
 	}
+}
+
+// OpusSendState returns an atomic snapshot of the high-level audio send
+// boundary. Audio generation changes whenever Discord establishes a fresh UDP
+// encryption session, but remains stable across a successful voice resume.
+// Stateful Opus encoders should reset when generation changes.
+func (v *VoiceConnection) OpusSendState() (send chan<- []byte, ready bool, generation uint64) {
+	v.RLock()
+	defer v.RUnlock()
+	return v.OpusSend, v.Ready, v.audioGeneration
 }
 
 // VoiceSpeakingUpdateHandler type provides a function definition for the
@@ -988,6 +999,7 @@ func (v *VoiceConnection) onEventForGeneration(
 		if v.OpusSend == nil {
 			v.OpusSend = make(chan []byte, 16)
 		}
+		v.audioGeneration++
 		udpConn := v.udpConn
 		closeChannel := v.close
 		opusSend := v.OpusSend

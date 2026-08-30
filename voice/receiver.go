@@ -20,13 +20,16 @@ var (
 
 const maxConcealedFrames = 10
 
-// Frame is one decoded 20 ms PCM frame. Concealed is true when PCM was
-// generated with Opus packet-loss concealment.
+// Frame is one decoded 20 ms PCM frame. A missing packet is marked as either
+// Recovered when in-band FEC was available or Concealed when PLC was used.
 type Frame struct {
 	SSRC      uint32
 	Sequence  uint16
 	PCM       []int16
 	Concealed bool
+	// Recovered is true when PCM came from in-band FEC carried by the next
+	// packet instead of packet-loss concealment.
+	Recovered bool
 }
 
 type decoderState struct {
@@ -99,19 +102,31 @@ func (r *Receiver) Decode(packet *dgo.Packet) ([]Frame, error) {
 			if missing > maxConcealedFrames {
 				return nil, fmt.Errorf("%w: missing %d packets", ErrPacketGapTooLarge, missing)
 			}
+			hasFEC, inspectErr := opus.PacketHasLBRR(packet.Opus)
+			if inspectErr != nil {
+				return nil, fmt.Errorf("inspect Opus FEC: %w", inspectErr)
+			}
 			frames = make([]Frame, 0, int(missing)+1)
 			for offset := uint16(0); offset < missing; offset++ {
 				pcm := make([]int16, FrameSize*r.channels)
-				samples, decodeErr := state.decoder.DecodePLC(pcm, FrameSize)
+				recoverWithFEC := hasFEC && offset == missing-1
+				var samples int
+				var decodeErr error
+				if recoverWithFEC {
+					samples, decodeErr = state.decoder.DecodeFEC(packet.Opus, pcm)
+				} else {
+					samples, decodeErr = state.decoder.DecodePLC(pcm, FrameSize)
+				}
 				if decodeErr != nil {
 					delete(r.streams, packet.SSRC)
-					return nil, fmt.Errorf("conceal Opus frame: %w", decodeErr)
+					return nil, fmt.Errorf("recover missing Opus frame: %w", decodeErr)
 				}
 				frames = append(frames, Frame{
 					SSRC:      packet.SSRC,
 					Sequence:  state.nextSequence + offset,
 					PCM:       pcm[:samples*r.channels],
-					Concealed: true,
+					Concealed: !recoverWithFEC,
+					Recovered: recoverWithFEC,
 				})
 			}
 		case missing >= 1<<15:

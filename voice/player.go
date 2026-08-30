@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 
 	dgo "github.com/darui3018823/discord.go"
@@ -25,16 +26,22 @@ var (
 	ErrVoiceNotReady = errors.New("voice connection is not ready")
 	// ErrInvalidPCMFrame is returned when a PCM frame is not exactly 20 ms.
 	ErrInvalidPCMFrame = errors.New("invalid PCM frame")
+	// ErrInvalidVolume is returned for negative, NaN, or infinite gain.
+	ErrInvalidVolume = errors.New("invalid volume")
 )
 
 // Player encodes interleaved PCM into 20 ms Opus packets and queues them on a
 // Discord Voice connection. A Player serializes its stateful Opus encoder and
 // is safe for concurrent callers.
 type Player struct {
-	connection *dgo.VoiceConnection
-	encoder    *opus.Encoder
-	channels   int
-	mu         sync.Mutex
+	connection    *dgo.VoiceConnection
+	encoder       *opus.Encoder
+	channels      int
+	mu            sync.Mutex
+	volume        float64
+	generation    uint64
+	generationSet bool
+	needsReset    bool
 }
 
 // NewPlayer creates a PCM player for a ready or connecting Voice connection.
@@ -57,6 +64,7 @@ func NewPlayer(connection *dgo.VoiceConnection, channels int) (*Player, error) {
 		connection: connection,
 		encoder:    encoder,
 		channels:   channels,
+		volume:     1,
 	}, nil
 }
 
@@ -72,12 +80,50 @@ func (p *Player) SetBitrate(bitrate int) error {
 	return p.encoder.SetBitrate(bitrate)
 }
 
+// SetInbandFEC enables Opus forward error correction for lossy voice links.
+func (p *Player) SetInbandFEC(enabled bool) {
+	p.mu.Lock()
+	p.encoder.SetInbandFEC(enabled)
+	p.mu.Unlock()
+}
+
+// SetPacketLossPercent sets the expected loss percentage used by the Opus
+// encoder when allocating FEC redundancy.
+func (p *Player) SetPacketLossPercent(percent int) {
+	p.mu.Lock()
+	p.encoder.SetPacketLossPerc(percent)
+	p.mu.Unlock()
+}
+
+// SetVolume sets linear PCM gain. One is unchanged, zero is silent, and
+// values above one amplify with int16 saturation.
+func (p *Player) SetVolume(volume float64) error {
+	if volume < 0 || math.IsNaN(volume) || math.IsInf(volume, 0) {
+		return ErrInvalidVolume
+	}
+	p.mu.Lock()
+	p.volume = volume
+	p.mu.Unlock()
+	return nil
+}
+
+// Volume returns the current linear PCM gain.
+func (p *Player) Volume() float64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.volume
+}
+
 // Reset clears Opus stream history while preserving encoder controls. Call it
 // when starting a logically new audio stream.
 func (p *Player) Reset() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.encoder.Reset()
+	if err := p.encoder.Reset(); err != nil {
+		return err
+	}
+	p.needsReset = false
+	return nil
 }
 
 // WriteFrame encodes and queues one 20 ms interleaved PCM frame. The input is
@@ -90,18 +136,38 @@ func (p *Player) WriteFrame(ctx context.Context, pcm []int16) error {
 		return fmt.Errorf("%w: got %d samples, want %d", ErrInvalidPCMFrame, len(pcm), FrameSize*p.channels)
 	}
 
+	send, ready, generation := p.connection.OpusSendState()
+	if send == nil || !ready {
+		return ErrVoiceNotReady
+	}
+
 	p.mu.Lock()
-	defer p.mu.Unlock()
-	packet, err := p.encoder.Encode(pcm, FrameSize)
+	if !p.generationSet || generation != p.generation || p.needsReset {
+		if p.generationSet || p.needsReset {
+			if err := p.encoder.Reset(); err != nil {
+				p.mu.Unlock()
+				return fmt.Errorf("reset Opus encoder after voice reconnect: %w", err)
+			}
+		}
+		p.generation = generation
+		p.generationSet = true
+		p.needsReset = false
+	}
+	input := pcm
+	if p.volume != 1 {
+		input = applyVolume(pcm, p.volume)
+	}
+	packet, err := p.encoder.Encode(input, FrameSize)
+	p.mu.Unlock()
 	if err != nil {
 		return fmt.Errorf("encode Opus frame: %w", err)
 	}
 
-	p.connection.RLock()
-	send := p.connection.OpusSend
-	ready := p.connection.Ready
-	p.connection.RUnlock()
-	if send == nil || !ready {
+	currentSend, currentReady, currentGeneration := p.connection.OpusSendState()
+	if currentSend == nil || currentSend != send || !currentReady || currentGeneration != generation {
+		p.mu.Lock()
+		p.needsReset = true
+		p.mu.Unlock()
 		return ErrVoiceNotReady
 	}
 
@@ -111,4 +177,20 @@ func (p *Player) WriteFrame(ctx context.Context, pcm []int16) error {
 	case send <- packet:
 		return nil
 	}
+}
+
+func applyVolume(pcm []int16, volume float64) []int16 {
+	adjusted := make([]int16, len(pcm))
+	for index, sample := range pcm {
+		scaled := math.Round(float64(sample) * volume)
+		switch {
+		case scaled > math.MaxInt16:
+			adjusted[index] = math.MaxInt16
+		case scaled < math.MinInt16:
+			adjusted[index] = math.MinInt16
+		default:
+			adjusted[index] = int16(scaled)
+		}
+	}
+	return adjusted
 }
