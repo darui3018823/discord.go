@@ -4,6 +4,7 @@ go 1.26.6
 
 require (
 	github.com/cloudflare/circl v1.6.4
+	github.com/darui3018823/opus v1.4.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/thomas-vilte/mls-go v1.6.0
 	golang.org/x/crypto v0.54.0
