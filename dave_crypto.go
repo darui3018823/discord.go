@@ -9,7 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/darui3018823/dgo/mls"
+	"github.com/darui3018823/discord.go/mls"
 )
 
 var errNotDAVEFrame = fmt.Errorf("not a DAVE frame")

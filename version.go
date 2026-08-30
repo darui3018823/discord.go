@@ -6,14 +6,14 @@ import (
 )
 
 const (
-	dgoModulePath   = "github.com/darui3018823/dgo"
+	dgoModulePath   = "github.com/darui3018823/discord.go"
 	develVersion    = "devel"
 	vcsRevisionSize = 12
 )
 
 // buildVersion can be set by release tooling with:
 //
-//	-ldflags "-X github.com/darui3018823/dgo.buildVersion=v1.2.3"
+//	-ldflags "-X github.com/darui3018823/discord.go.buildVersion=v1.2.3"
 var buildVersion string
 
 // VERSION is the dgo module version reported by sessions and user agents.

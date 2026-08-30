@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/darui3018823/dgo"
+	"github.com/darui3018823/discord.go"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v3/pkg/media"
 	"github.com/pion/webrtc/v3/pkg/media/oggwriter"

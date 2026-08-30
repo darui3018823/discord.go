@@ -1,11 +1,11 @@
-module github.com/darui3018823/dgo/examples/voice_receive
+module github.com/darui3018823/discord.go/examples/voice_receive
 
 go 1.26.6
 
-replace github.com/darui3018823/dgo => ../../
+replace github.com/darui3018823/discord.go => ../../
 
 require (
-	github.com/darui3018823/dgo v1.0.0
+	github.com/darui3018823/discord.go v1.0.0
 	github.com/pion/rtp v1.10.5
 	github.com/pion/webrtc/v3 v3.3.6
 )

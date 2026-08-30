@@ -7,7 +7,7 @@ autocomplete options in Slash Commands. As this example uses interactions,
 slash commands and slash command options, it is recommended to read
 `slash_commands` example before proceeding.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

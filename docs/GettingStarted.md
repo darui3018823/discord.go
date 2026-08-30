@@ -19,7 +19,7 @@ Create or open a Go module, then add dgo:
 
 ```sh
 go mod init example.com/my-bot
-go get github.com/darui3018823/dgo@v1.1.0
+go get github.com/darui3018823/discord.go@v1.1.0
 ```
 
 There is no need to copy the repository into `GOPATH` or run `go install` for
@@ -35,7 +35,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/darui3018823/dgo"
+	"github.com/darui3018823/discord.go"
 )
 
 func main() {
@@ -89,8 +89,8 @@ Portal. See Discord's
 
 ## Next steps
 
-- Browse the [examples on GitHub](https://github.com/darui3018823/dgo/tree/master/examples).
+- Browse the [examples on GitHub](https://github.com/darui3018823/discord.go/tree/master/examples).
 - Review the [migration and compatibility guide](Migration.md).
 - Check the [public API inventory](API.md).
-- Use the [package reference](https://pkg.go.dev/github.com/darui3018823/dgo)
+- Use the [package reference](https://pkg.go.dev/github.com/darui3018823/discord.go)
   for exported types and methods.

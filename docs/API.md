@@ -1,7 +1,7 @@
 # Public API inventory
 
 The complete public API is the set of exported declarations documented at
-[pkg.go.dev/github.com/darui3018823/dgo](https://pkg.go.dev/github.com/darui3018823/dgo).
+[pkg.go.dev/github.com/darui3018823/discord.go](https://pkg.go.dev/github.com/darui3018823/discord.go).
 This page identifies the main surfaces and defines the reproducible inventory
 used during releases.
 
@@ -25,8 +25,8 @@ does not make private Discord client routes supported.
 From a clean checkout at the release commit:
 
 ```sh
-go doc -all github.com/darui3018823/dgo > dgo-api.txt
-go list -json github.com/darui3018823/dgo > dgo-package.json
+go doc -all github.com/darui3018823/discord.go > dgo-api.txt
+go list -json github.com/darui3018823/discord.go > dgo-package.json
 ```
 
 `dgo-api.txt` is the human-readable exported declaration inventory.

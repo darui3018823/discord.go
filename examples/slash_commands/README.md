@@ -7,7 +7,7 @@ which would be able to listen and respond to interactions. This example covers a
 of slash command interactions: options, choices, responses and followup messages.
 To avoid confusion, this example is more of a **step-by-step tutorial**, than a demonstration bot.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

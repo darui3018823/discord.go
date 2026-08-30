@@ -5,7 +5,7 @@
 This example demonstrates how to use dgo to listen for an `!airhorn`
 command in a channel and then play a sound to that user's current voice channel.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

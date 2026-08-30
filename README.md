@@ -1,11 +1,15 @@
-# dgo
+# discord.go
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/darui3018823/dgo.svg)](https://pkg.go.dev/github.com/darui3018823/dgo)
-[![CI](https://github.com/darui3018823/dgo/actions/workflows/ci.yml/badge.svg)](https://github.com/darui3018823/dgo/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/darui3018823/discord.go.svg)](https://pkg.go.dev/github.com/darui3018823/discord.go)
 
-dgo is a Go library for Discord's REST, Gateway, and Voice APIs. It is an
-independent hard fork of [bwmarrin/discordgo](https://github.com/bwmarrin/discordgo)
-with its own compatibility and release policy.
+discord.go is an experimental high-level Discord framework for Go. It embeds
+the proven REST, Gateway, interaction, state, and Voice implementation forked
+from [dgo](https://github.com/darui3018823/dgo), then adds an opinionated bot,
+command, component, task, and audio layer on top.
+
+The copied low-level API is intentionally kept available while the high-level
+API is developed. Its root Go package is still named `dgo` for now, so callers
+may import it with a `discord` alias when preferred.
 
 ## Highlights
 
@@ -20,13 +24,13 @@ with its own compatibility and release policy.
 ## Install
 
 ```sh
-go get github.com/darui3018823/dgo@v1.1.0
+go get github.com/darui3018823/discord.go@v1.1.0
 ```
 
 Import the package as `dgo`:
 
 ```go
-import "github.com/darui3018823/dgo"
+import "github.com/darui3018823/discord.go"
 ```
 
 Create a bot session from a raw bot token. `NewBot` adds the required `Bot `
@@ -51,7 +55,7 @@ private client routes are not supported.
 - [Webhook Events and Application Identity Profiles](docs/WebhookEvents.md)
 - [v1.1.0 release notes](docs/releases/v1.1.0.md)
 - [Public API inventory](docs/API.md)
-- [Package reference](https://pkg.go.dev/github.com/darui3018823/dgo)
+- [Package reference](https://pkg.go.dev/github.com/darui3018823/discord.go)
 - [Examples](examples)
 
 The exported `VERSION` value and `Version()` function are resolved from Go
@@ -62,7 +66,7 @@ with VCS information when available.
 ## Support and contributing
 
 For dgo bugs and feature requests, use
-[GitHub Issues](https://github.com/darui3018823/dgo/issues). For general Go
+[GitHub Issues](https://github.com/darui3018823/discord.go/issues). For general Go
 discussion, visit the [Discord Gophers](https://discord.gg/golang) community.
 
 Before opening a pull request:

@@ -1,5 +1,5 @@
 // dgo - Discord bindings for Go
-// Available at https://github.com/darui3018823/dgo
+// Available at https://github.com/darui3018823/discord.go
 
 // Copyright 2015-2016 Bruce Marriner <bruce@sqls.net>.  All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -100,7 +100,7 @@ func newSession(token string) *Session {
 		MaxRestRetryWait:                   5 * time.Minute,
 		Client:                             &http.Client{Timeout: (20 * time.Second)},
 		Dialer:                             websocket.DefaultDialer,
-		UserAgent:                          "DiscordBot (https://github.com/darui3018823/dgo, " + versionLabel + ")",
+		UserAgent:                          "DiscordBot (https://github.com/darui3018823/discord.go, " + versionLabel + ")",
 		sequence:                           new(int64),
 		LastHeartbeatAck:                   time.Now().UTC(),
 		Logger:                             slog.Default(),

@@ -18,8 +18,8 @@ path, documentation, and issue tracker when working with this repository.
 - [v1.1.0 release notes](releases/v1.1.0.md)
 - [Public API inventory](API.md)
 - [Upstream synchronization decisions](UpstreamSync.md)
-- [Package reference](https://pkg.go.dev/github.com/darui3018823/dgo)
-- [Examples on GitHub](https://github.com/darui3018823/dgo/tree/master/examples)
+- [Package reference](https://pkg.go.dev/github.com/darui3018823/discord.go)
+- [Examples on GitHub](https://github.com/darui3018823/discord.go/tree/master/examples)
 
 ## Design goals
 
@@ -30,6 +30,6 @@ path, documentation, and issue tracker when working with this repository.
 - Predictable compatibility and deprecation guidance
 
 For dgo-specific support, use
-[GitHub Issues](https://github.com/darui3018823/dgo/issues). The
+[GitHub Issues](https://github.com/darui3018823/discord.go/issues). The
 [Discord Gophers](https://discord.gg/golang) community is available for
 general Go discussion.

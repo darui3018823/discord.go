@@ -15,7 +15,7 @@ available.
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately through
-[GitHub private vulnerability reporting](https://github.com/darui3018823/dgo/security/advisories/new).
+[GitHub private vulnerability reporting](https://github.com/darui3018823/discord.go/security/advisories/new).
 Do not open a public issue for an undisclosed vulnerability.
 
 Include:

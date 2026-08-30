@@ -11,7 +11,7 @@ behavior changes in the next section and the full
 [v1.0.0 release notes](releases/v1.0.0.md).
 
 ```sh
-go get github.com/darui3018823/dgo@v1.0.0
+go get github.com/darui3018823/discord.go@v1.0.0
 go mod tidy
 ```
 
@@ -30,7 +30,7 @@ Replace old imports with the dgo module:
 
 ```diff
 - import "github.com/bwmarrin/discordgo"
-+ import "github.com/darui3018823/dgo"
++ import "github.com/darui3018823/discord.go"
 ```
 
 If the old package was imported without an alias, update package references

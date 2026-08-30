@@ -8,7 +8,7 @@ that sends the response through Direct Message.
 This Bot will respond to "ping" in any server it's in with "Pong!" in the
 sender's DM.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

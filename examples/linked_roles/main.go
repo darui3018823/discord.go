@@ -16,7 +16,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/darui3018823/dgo"
+	"github.com/darui3018823/discord.go"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
 )

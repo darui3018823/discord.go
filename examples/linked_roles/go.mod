@@ -1,11 +1,11 @@
-module github.com/darui3018823/dgo/examples/linked_roles
+module github.com/darui3018823/discord.go/examples/linked_roles
 
 go 1.26.6
 
-replace github.com/darui3018823/dgo => ../../
+replace github.com/darui3018823/discord.go => ../../
 
 require (
-	github.com/darui3018823/dgo v1.0.0
+	github.com/darui3018823/discord.go v1.0.0
 	github.com/joho/godotenv v1.5.1
 	golang.org/x/oauth2 v0.35.0
 )

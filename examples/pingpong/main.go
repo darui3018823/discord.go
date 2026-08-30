@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/darui3018823/dgo"
+	"github.com/darui3018823/discord.go"
 )
 
 // Variables used for command line parameters

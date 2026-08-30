@@ -43,7 +43,7 @@ Please note that voice receive is **not** officially supported and may break
 at essentially any time (and has in the past). This code works at the time of
 its writing, but YMMV in the future.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

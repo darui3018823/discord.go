@@ -7,7 +7,7 @@ inputs in modals. If you have not read `slash_commands` and `components`
 examples yet it is recommended to do so before proceeding. As this example
 is built using interactions and Slash Commands.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

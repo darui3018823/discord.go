@@ -1,4 +1,4 @@
-module github.com/darui3018823/dgo
+module github.com/darui3018823/discord.go
 
 go 1.26.6
 

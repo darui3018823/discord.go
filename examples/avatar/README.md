@@ -6,7 +6,7 @@ This example demonstrates how to use dgo to change the avatar for
 a Discord account.  This example works both with a local file or the URL of
 an image.
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

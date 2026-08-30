@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/darui3018823/dgo/mls"
+	"github.com/darui3018823/discord.go/mls"
 )
 
 var errUnencryptedDAVEFrame = errors.New("received an unencrypted frame while DAVE is active")

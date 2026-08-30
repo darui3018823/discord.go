@@ -13,6 +13,6 @@ Most examples are part of the root module. The standalone modules are
 are verified separately by CI.
 
 For dgo-specific problems, use
-[GitHub Issues](https://github.com/darui3018823/dgo/issues). The
+[GitHub Issues](https://github.com/darui3018823/discord.go/issues). The
 [Discord Gophers](https://discord.gg/golang) community is intended for general
 Go discussion.

@@ -6,7 +6,7 @@ This example demonstrates how to use dgo to create a ping-pong bot.
 
 This Bot will respond to "ping" with "Pong!" and "pong" with "Ping!".
 
-For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/dgo/issues).
+For dgo-specific problems, use [GitHub Issues](https://github.com/darui3018823/discord.go/issues).
 For general Go discussion, visit [Discord Gophers](https://discord.gg/golang).
 
 ### Build

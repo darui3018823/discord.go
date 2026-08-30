@@ -2,7 +2,7 @@
 
 > これは2026-07-29時点の監査結果と、その後の対応履歴を保存したアーカイブ資料です。監査対象は当時のcommitであり、現在のリリース状態を直接示す文書ではありません。監査対応はmerge commit `e3eb634`へ反映され、`v1.0.0-rc.1` tagが付与されています。最新の方針やAPI互換性については、[Migration.md](../Migration.md)と[API.md](../API.md)を参照してください。
 
-- 対象リポジトリ: `github.com/darui3018823/dgo`
+- 対象リポジトリ: `github.com/darui3018823/discord.go`
 - 対象コミット: `1d4f1613163a8029d7ce6368dc687571fcdd52ac`
 - 対象ブランチ: `master`
 - 監査日: 2026-07-29
@@ -1632,8 +1632,8 @@ tag pushでCreate Release workflowが独立して動き、独自の`go test`だ�
 
 参照:
 
-- [v0.30.4 release run](https://github.com/darui3018823/dgo/actions/runs/26580402334)
-- [v0.30.4 failed CI](https://github.com/darui3018823/dgo/actions/runs/26580402458)
+- [v0.30.4 release run](https://github.com/darui3018823/discord.go/actions/runs/26580402334)
+- [v0.30.4 failed CI](https://github.com/darui3018823/discord.go/actions/runs/26580402458)
 
 推奨:
 
@@ -2072,9 +2072,9 @@ major releaseでの破壊的変更を推奨する。
 
 ## Repository
 
-- [dgo GitHub Actions](https://github.com/darui3018823/dgo/actions)
-- [dgo latest stable release](https://github.com/darui3018823/dgo/releases/tag/v0.30.6)
-- [dgo v1.0.0-rc.1 source tag](https://github.com/darui3018823/dgo/tree/v1.0.0-rc.1)
+- [dgo GitHub Actions](https://github.com/darui3018823/discord.go/actions)
+- [dgo latest stable release](https://github.com/darui3018823/discord.go/releases/tag/v0.30.6)
+- [dgo v1.0.0-rc.1 source tag](https://github.com/darui3018823/discord.go/tree/v1.0.0-rc.1)
 - [upstream discordgo](https://github.com/bwmarrin/discordgo)
 
 ---
@@ -2202,10 +2202,10 @@ malformed RTPについては`go test -fuzz=FuzzDecodeVoicePacket -fuzztime=10s`�
 監査対応を含むPR #4は`master`へmergeされ、次の状態になっている。
 
 - merge commit: `e3eb63433733b32deba5c2f8c4414f9e404af2f8`
-- PR: [#4](https://github.com/darui3018823/dgo/pull/4)
+- PR: [#4](https://github.com/darui3018823/discord.go/pull/4)
 - release candidate tag: `v1.0.0-rc.1`
-- merge commitのCI: [success](https://github.com/darui3018823/dgo/actions/runs/30703694930)
-- merge commitのCodeQL: [success](https://github.com/darui3018823/dgo/actions/runs/30703694948)
-- RC tagのCreate Release workflow: [success](https://github.com/darui3018823/dgo/actions/runs/30704299605)
+- merge commitのCI: [success](https://github.com/darui3018823/discord.go/actions/runs/30703694930)
+- merge commitのCodeQL: [success](https://github.com/darui3018823/discord.go/actions/runs/30703694948)
+- RC tagのCreate Release workflow: [success](https://github.com/darui3018823/discord.go/actions/runs/30704299605)
 
 したがって、監査対応の実装、ローカル検証、remote CI検証、RC tag作成までを完了状態とする。一方、実Discord Gateway、Voice、DAVEとのE2E・interopは未実施という制限を残す。
