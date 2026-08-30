@@ -44,9 +44,21 @@ type Bot struct {
 
 	mu          sync.RWMutex
 	commands    map[commandKey]*Command
+	checks      []Check
 	middleware  []Middleware
 	errorHandle ErrorHandler
 	removeEvent func()
+}
+
+// AddChecks registers global checks that run before every command.
+func (b *Bot) AddChecks(checks ...Check) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for _, check := range checks {
+		if check != nil {
+			b.checks = append(b.checks, check)
+		}
+	}
 }
 
 // New creates a Bot around an existing low-level Session.
@@ -148,8 +160,7 @@ func (b *Bot) CommandDefinitions() []*dgo.ApplicationCommand {
 	b.mu.RLock()
 	definitions := make([]*dgo.ApplicationCommand, 0, len(b.commands))
 	for _, command := range b.commands {
-		definition := *command.Definition
-		definitions = append(definitions, &definition)
+		definitions = append(definitions, command.clone().Definition)
 	}
 	b.mu.RUnlock()
 
@@ -199,6 +210,7 @@ func (b *Bot) Dispatch(ctx context.Context, event *dgo.InteractionCreate) bool {
 
 	b.mu.RLock()
 	command := b.commands[commandKey{typeID: typeID, name: data.Name}]
+	checks := append([]Check(nil), b.checks...)
 	middleware := append([]Middleware(nil), b.middleware...)
 	errorHandler := b.errorHandle
 	b.mu.RUnlock()
@@ -208,8 +220,23 @@ func (b *Bot) Dispatch(ctx context.Context, event *dgo.InteractionCreate) bool {
 
 	path, options, routeErr := resolveCommandRoute(data.Options)
 	handler := command.Handler
+	checks = append(checks, command.Checks...)
+	middleware = append(middleware, command.Middleware...)
+	if command.OnError != nil {
+		errorHandler = command.OnError
+	}
 	if len(path) > 0 {
-		handler = command.routes[routeKey(path)]
+		route := command.routes[routeKey(path)]
+		if route != nil {
+			handler = route.handler
+			checks = append(checks, route.checks...)
+			middleware = append(middleware, route.middleware...)
+			if route.errorHandler != nil {
+				errorHandler = route.errorHandler
+			}
+		} else {
+			handler = nil
+		}
 	}
 
 	commandContext := &Context{
@@ -226,17 +253,88 @@ func (b *Bot) Dispatch(ctx context.Context, event *dgo.InteractionCreate) bool {
 			if routeErr == nil {
 				routeErr = fmt.Errorf("%w: %s", ErrCommandRouteNotFound, data.Name)
 			}
-			errorHandler(commandContext, routeErr)
+			reportCommandError(errorHandler, commandContext, routeErr)
 		}
 		return true
 	}
-	for index := len(middleware) - 1; index >= 0; index-- {
-		handler = middleware[index](handler)
+	for index, check := range checks {
+		if check == nil {
+			continue
+		}
+		if err := invokeCheck(check, commandContext); err != nil {
+			if errorHandler != nil {
+				reportCommandError(errorHandler, commandContext, &CheckError{Index: index, Err: err})
+			}
+			return true
+		}
 	}
-	if err := handler(commandContext); err != nil && errorHandler != nil {
-		errorHandler(commandContext, err)
+	for index := len(middleware) - 1; index >= 0; index-- {
+		if middleware[index] != nil {
+			var middlewareErr error
+			handler, middlewareErr = wrapHandler(middleware[index], handler)
+			if middlewareErr != nil || handler == nil {
+				if errorHandler != nil {
+					if middlewareErr == nil {
+						middlewareErr = errors.New("command middleware returned a nil handler")
+					}
+					reportCommandError(errorHandler, commandContext, middlewareErr)
+				}
+				return true
+			}
+		}
+	}
+	if err := invokeHandler(handler, commandContext); err != nil && errorHandler != nil {
+		reportCommandError(errorHandler, commandContext, err)
 	}
 	return true
+}
+
+// PanicError wraps a recovered command-handler panic.
+type PanicError struct {
+	Value any
+}
+
+func (e *PanicError) Error() string {
+	return fmt.Sprintf("command handler panicked: %v", e.Value)
+}
+
+func invokeHandler(handler Handler, ctx *Context) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = &PanicError{Value: recovered}
+		}
+	}()
+	return handler(ctx)
+}
+
+func invokeCheck(check Check, ctx *Context) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = &PanicError{Value: recovered}
+		}
+	}()
+	return check(ctx)
+}
+
+func wrapHandler(middleware Middleware, next Handler) (handler Handler, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = &PanicError{Value: recovered}
+		}
+	}()
+	return middleware(next), nil
+}
+
+func reportCommandError(handler ErrorHandler, ctx *Context, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			slog.Default().Error("discord command error handler panicked",
+				"command", ctx.Data.Name,
+				"panic", recovered,
+			)
+		}
+	}()
+	handler(ctx, err)
 }
 
 // Run opens the Gateway, waits for cancellation, and closes the Session.

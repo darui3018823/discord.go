@@ -14,14 +14,27 @@ type Handler func(*Context) error
 // order, so the first middleware registered is the outermost wrapper.
 type Middleware func(Handler) Handler
 
+// Check authorizes one command invocation before its handler runs.
+type Check func(*Context) error
+
 // ErrorHandler receives errors returned by command handlers.
 type ErrorHandler func(*Context, error)
+
+type commandRoute struct {
+	handler      Handler
+	checks       []Check
+	middleware   []Middleware
+	errorHandler ErrorHandler
+}
 
 // Command combines a Discord command definition with local handlers.
 type Command struct {
 	Definition *dgo.ApplicationCommand
 	Handler    Handler
-	routes     map[string]Handler
+	Checks     []Check
+	Middleware []Middleware
+	OnError    ErrorHandler
+	routes     map[string]*commandRoute
 }
 
 // Subcommand describes one chat-input subcommand and its leaf options.
@@ -30,6 +43,9 @@ type Subcommand struct {
 	Description string
 	Options     []*dgo.ApplicationCommandOption
 	Handler     Handler
+	Checks      []Check
+	Middleware  []Middleware
+	OnError     ErrorHandler
 }
 
 // Sub creates a chat-input subcommand.
@@ -59,7 +75,7 @@ func Slash(name, description string, handler Handler) *Command {
 			Description: description,
 		},
 		Handler: handler,
-		routes:  make(map[string]Handler),
+		routes:  make(map[string]*commandRoute),
 	}
 }
 
@@ -68,7 +84,7 @@ func UserCommand(name string, handler Handler) *Command {
 	return &Command{
 		Definition: &dgo.ApplicationCommand{Type: dgo.UserApplicationCommand, Name: name},
 		Handler:    handler,
-		routes:     make(map[string]Handler),
+		routes:     make(map[string]*commandRoute),
 	}
 }
 
@@ -77,8 +93,54 @@ func MessageCommand(name string, handler Handler) *Command {
 	return &Command{
 		Definition: &dgo.ApplicationCommand{Type: dgo.MessageApplicationCommand, Name: name},
 		Handler:    handler,
-		routes:     make(map[string]Handler),
+		routes:     make(map[string]*commandRoute),
 	}
+}
+
+// AddChecks adds command-local authorization checks.
+func (c *Command) AddChecks(checks ...Check) {
+	for _, check := range checks {
+		if check != nil {
+			c.Checks = append(c.Checks, check)
+		}
+	}
+}
+
+// Use adds command-local middleware.
+func (c *Command) Use(middleware ...Middleware) {
+	for _, item := range middleware {
+		if item != nil {
+			c.Middleware = append(c.Middleware, item)
+		}
+	}
+}
+
+// SetErrorHandler sets the command-local error handler.
+func (c *Command) SetErrorHandler(handler ErrorHandler) {
+	c.OnError = handler
+}
+
+// AddChecks adds subcommand-local authorization checks.
+func (s *Subcommand) AddChecks(checks ...Check) {
+	for _, check := range checks {
+		if check != nil {
+			s.Checks = append(s.Checks, check)
+		}
+	}
+}
+
+// Use adds subcommand-local middleware.
+func (s *Subcommand) Use(middleware ...Middleware) {
+	for _, item := range middleware {
+		if item != nil {
+			s.Middleware = append(s.Middleware, item)
+		}
+	}
+}
+
+// SetErrorHandler sets the subcommand-local error handler.
+func (s *Subcommand) SetErrorHandler(handler ErrorHandler) {
+	s.OnError = handler
 }
 
 // AddSubcommands adds top-level subcommands and derives their Discord command
@@ -88,6 +150,7 @@ func (c *Command) AddSubcommands(commands ...*Subcommand) error {
 	if err := c.validateSubcommandContainer(); err != nil {
 		return err
 	}
+	seen := make(map[string]struct{}, len(commands))
 	for _, command := range commands {
 		if err := validateSubcommand(command); err != nil {
 			return err
@@ -95,6 +158,10 @@ func (c *Command) AddSubcommands(commands ...*Subcommand) error {
 		if c.topLevelOptionExists(command.Name) {
 			return fmt.Errorf("%w: duplicate subcommand %q", ErrInvalidCommand, command.Name)
 		}
+		if _, exists := seen[command.Name]; exists {
+			return fmt.Errorf("%w: duplicate subcommand %q", ErrInvalidCommand, command.Name)
+		}
+		seen[command.Name] = struct{}{}
 	}
 	for _, command := range commands {
 		c.Definition.Options = append(c.Definition.Options, &dgo.ApplicationCommandOption{
@@ -103,7 +170,7 @@ func (c *Command) AddSubcommands(commands ...*Subcommand) error {
 			Description: command.Description,
 			Options:     cloneOptions(command.Options),
 		})
-		c.routes[routeKey([]string{command.Name})] = command.Handler
+		c.routes[routeKey([]string{command.Name})] = routeFor(command)
 	}
 	return nil
 }
@@ -114,6 +181,7 @@ func (c *Command) AddGroups(groups ...*SubcommandGroup) error {
 	if err := c.validateSubcommandContainer(); err != nil {
 		return err
 	}
+	seenGroups := make(map[string]struct{}, len(groups))
 	for _, group := range groups {
 		if group == nil || group.Name == "" || group.Description == "" || len(group.Commands) == 0 {
 			return fmt.Errorf("%w: invalid subcommand group", ErrInvalidCommand)
@@ -121,6 +189,10 @@ func (c *Command) AddGroups(groups ...*SubcommandGroup) error {
 		if c.topLevelOptionExists(group.Name) {
 			return fmt.Errorf("%w: duplicate subcommand group %q", ErrInvalidCommand, group.Name)
 		}
+		if _, exists := seenGroups[group.Name]; exists {
+			return fmt.Errorf("%w: duplicate subcommand group %q", ErrInvalidCommand, group.Name)
+		}
+		seenGroups[group.Name] = struct{}{}
 		seen := make(map[string]struct{}, len(group.Commands))
 		for _, command := range group.Commands {
 			if err := validateSubcommand(command); err != nil {
@@ -145,7 +217,7 @@ func (c *Command) AddGroups(groups ...*SubcommandGroup) error {
 				Description: command.Description,
 				Options:     cloneOptions(command.Options),
 			})
-			c.routes[routeKey([]string{group.Name, command.Name})] = command.Handler
+			c.routes[routeKey([]string{group.Name, command.Name})] = routeFor(command)
 		}
 		c.Definition.Options = append(c.Definition.Options, option)
 	}
@@ -157,7 +229,7 @@ func (c *Command) validateSubcommandContainer() error {
 		return fmt.Errorf("%w: subcommands require a chat-input command", ErrInvalidCommand)
 	}
 	if c.routes == nil {
-		c.routes = make(map[string]Handler)
+		c.routes = make(map[string]*commandRoute)
 	}
 	for _, option := range c.Definition.Options {
 		if option != nil && option.Type != dgo.ApplicationCommandOptionSubCommand && option.Type != dgo.ApplicationCommandOptionSubCommandGroup {
@@ -171,10 +243,15 @@ func validateSubcommand(command *Subcommand) error {
 	if command == nil || command.Name == "" || command.Description == "" || command.Handler == nil {
 		return fmt.Errorf("%w: invalid subcommand", ErrInvalidCommand)
 	}
+	seen := make(map[string]struct{}, len(command.Options))
 	for _, option := range command.Options {
-		if option == nil || option.Type == dgo.ApplicationCommandOptionSubCommand || option.Type == dgo.ApplicationCommandOptionSubCommandGroup {
+		if option == nil || option.Name == "" || option.Description == "" || option.Type == dgo.ApplicationCommandOptionSubCommand || option.Type == dgo.ApplicationCommandOptionSubCommandGroup {
 			return fmt.Errorf("%w: invalid leaf option in subcommand %q", ErrInvalidCommand, command.Name)
 		}
+		if _, exists := seen[option.Name]; exists {
+			return fmt.Errorf("%w: duplicate option %q in subcommand %q", ErrInvalidCommand, option.Name, command.Name)
+		}
+		seen[option.Name] = struct{}{}
 	}
 	return nil
 }
@@ -193,16 +270,39 @@ func (c *Command) hasHandler() bool {
 }
 
 func (c *Command) clone() *Command {
-	copyCommand := &Command{Handler: c.Handler, routes: make(map[string]Handler, len(c.routes))}
+	copyCommand := &Command{
+		Handler:    c.Handler,
+		Checks:     append([]Check(nil), c.Checks...),
+		Middleware: append([]Middleware(nil), c.Middleware...),
+		OnError:    c.OnError,
+		routes:     make(map[string]*commandRoute, len(c.routes)),
+	}
 	if c.Definition != nil {
 		definition := *c.Definition
 		definition.Options = cloneOptions(c.Definition.Options)
 		copyCommand.Definition = &definition
 	}
-	for path, handler := range c.routes {
-		copyCommand.routes[path] = handler
+	for path, route := range c.routes {
+		if route == nil {
+			continue
+		}
+		copyCommand.routes[path] = &commandRoute{
+			handler:      route.handler,
+			checks:       append([]Check(nil), route.checks...),
+			middleware:   append([]Middleware(nil), route.middleware...),
+			errorHandler: route.errorHandler,
+		}
 	}
 	return copyCommand
+}
+
+func routeFor(command *Subcommand) *commandRoute {
+	return &commandRoute{
+		handler:      command.Handler,
+		checks:       append([]Check(nil), command.Checks...),
+		middleware:   append([]Middleware(nil), command.Middleware...),
+		errorHandler: command.OnError,
+	}
 }
 
 func cloneOptions(options []*dgo.ApplicationCommandOption) []*dgo.ApplicationCommandOption {
