@@ -30,8 +30,10 @@ site/
 # env file
 .env
 
-# Editor/IDE
-# .idea/
+# Editor/IDE. Share only curated JetBrains run configurations.
+.idea/*
+!.idea/runConfigurations/
+!.idea/runConfigurations/*.xml
 .vscode/
 
 implementation_plan (2).md

@@ -114,6 +114,20 @@ No Discord credentials are required for formatting, race tests, vet, coverage,
 or documentation validation. The live package skips automatically when its
 environment is not configured.
 
+GoLand and other JetBrains IDEs with the Go plugin load two shared Run
+Configurations from `.idea/runConfigurations`:
+
+- **Fulltest (Offline)** always removes the live-test variables for that run.
+- **Fulltest (Interactive Live)** asks in the Run console whether to enable the
+  live phase, then accepts the optional guild and standard Voice channel IDs.
+
+The interactive configuration does not ask for the bot token because Run
+console input is echoed. Configure `test_bot_token` in the operating-system or
+your private IDE environment, never in the shared XML. If the variable was
+added after the IDE started, restart the IDE so the Run process inherits it.
+Press Enter at the first prompt to run offline. Existing resource IDs are shown
+as defaults; enter `-` to clear one for the current run.
+
 ### Live Discord command and Voice test
 
 Use a dedicated test application and test guild. Do not use a production bot
