@@ -167,7 +167,7 @@ func configureInteractive(input io.Reader, output io.Writer) error {
 	}
 	if os.Getenv(liveTokenEnvironment) == "" {
 		return fmt.Errorf(
-			"%s is not set; configure it in the IDE or operating-system environment and restart the IDE if necessary (the token is never requested in the echoed Run console)",
+			"%s is not set; the JetBrains interactive Run Configuration supplies it with a masked Password dialog, while CLI runs must inherit it from the environment",
 			liveTokenEnvironment,
 		)
 	}

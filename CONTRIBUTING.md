@@ -118,15 +118,18 @@ GoLand and other JetBrains IDEs with the Go plugin load two shared Run
 Configurations from `.idea/runConfigurations`:
 
 - **Fulltest (Offline)** always removes the live-test variables for that run.
-- **Fulltest (Interactive Live)** asks in the Run console whether to enable the
-  live phase, then accepts the optional guild and standard Voice channel IDs.
+- **Fulltest (Interactive Live)** first uses JetBrains' masked `Password` macro
+  to request the raw test-bot token. It then asks in the Run console whether to
+  enable the live phase and accepts the optional guild and standard Voice
+  channel IDs.
 
-The interactive configuration does not ask for the bot token because Run
-console input is echoed. Configure `test_bot_token` in the operating-system or
-your private IDE environment, never in the shared XML. If the variable was
-added after the IDE started, restart the IDE so the Run process inherits it.
-Press Enter at the first prompt to run offline. Existing resource IDs are shown
-as defaults; enter `-` to clear one for the current run.
+The shared XML stores only `$Password:Discord test bot token$`; the entered
+token is masked and passed to the process as `test_bot_token`, never committed.
+The later Run-console input is echoed and therefore accepts only non-secret
+resource IDs. Press Enter at the first console prompt to run offline. Existing
+resource IDs are shown as defaults; enter `-` to clear one for the current run.
+When invoking `go run ./tools/cmd/fulltest -interactive` outside JetBrains, set
+`test_bot_token` in the shell because JetBrains macros are not available.
 
 ### Live Discord command and Voice test
 

@@ -3,6 +3,9 @@
     <module name="discord.go" />
     <working_directory value="$PROJECT_DIR$" />
     <parameters value="-interactive" />
+    <envs>
+      <env name="test_bot_token" value="$Password:Discord test bot token$" />
+    </envs>
     <kind value="PACKAGE" />
     <package value="github.com/darui3018823/discord.go/tools/cmd/fulltest" />
     <directory value="$PROJECT_DIR$" />
