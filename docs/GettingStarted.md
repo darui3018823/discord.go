@@ -1,6 +1,7 @@
 # Getting started
 
-This guide creates a minimal dgo bot session using the public Discord Bot API.
+This guide creates either a high-level discord.go bot or a low-level `dgo`
+session using the public Discord Bot API.
 
 ## Requirements
 
@@ -19,13 +20,41 @@ Create or open a Go module, then add dgo:
 
 ```sh
 go mod init example.com/my-bot
-go get github.com/darui3018823/discord.go@v1.1.0
+go get github.com/darui3018823/discord.go@latest
 ```
 
 There is no need to copy the repository into `GOPATH` or run `go install` for
 the library.
 
-## Minimal session
+## High-level bot
+
+For ordinary bot development, start with the `bot` package. This fragment
+assumes `ctx` is a cancellable signal context and the IDs come from your
+environment:
+
+```go
+client, err := bot.NewWithToken(os.Getenv("DISCORD_BOT_TOKEN"))
+if err != nil {
+	log.Fatal(err)
+}
+if err := client.Register(bot.Slash("ping", "Replies with pong", func(ctx *bot.Context) error {
+	return ctx.Reply("Pong!")
+})); err != nil {
+	log.Fatal(err)
+}
+if _, err := client.SyncCommandDiff(ctx, applicationID, guildID); err != nil {
+	log.Fatal(err)
+}
+if err := client.Run(ctx); err != nil {
+	log.Fatal(err)
+}
+```
+
+Use a guild ID while developing so command updates appear quickly. See the
+[high-level framework guide](HighLevel.md) for prefix commands, typed options,
+components, extensions, task loops, and lifecycle handling.
+
+## Minimal low-level session
 
 ```go
 package main
@@ -90,6 +119,8 @@ Portal. See Discord's
 ## Next steps
 
 - Browse the [examples on GitHub](https://github.com/darui3018823/discord.go/tree/master/examples).
+- Build with the [high-level framework](HighLevel.md).
+- Add playback or receive pipelines with the [Voice framework](VoiceFramework.md).
 - Review the [migration and compatibility guide](Migration.md).
 - Check the [public API inventory](API.md).
 - Use the [package reference](https://pkg.go.dev/github.com/darui3018823/discord.go)

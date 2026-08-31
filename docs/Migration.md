@@ -3,6 +3,22 @@
 This document describes migration from upstream discordgo or older dgo
 releases and defines how dgo changes its public API.
 
+## Moving from dgo to discord.go
+
+The low-level API was copied from `github.com/darui3018823/dgo` and remains in
+the root package named `dgo`. Change only the module path first; existing
+low-level code can continue to use the same package API:
+
+```diff
+- import "github.com/darui3018823/dgo"
++ import "github.com/darui3018823/discord.go"
+```
+
+Adopt `github.com/darui3018823/discord.go/bot` and
+`github.com/darui3018823/discord.go/voice` incrementally. The high-level
+packages wrap the root Session and VoiceConnection rather than replacing the
+REST, Gateway, State, DAVE, or event APIs.
+
 ## v1.0.0 baseline
 
 v1.0.0 establishes dgo's stable public API and compatibility policy. Upgrade

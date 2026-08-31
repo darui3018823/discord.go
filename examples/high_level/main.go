@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
+	dgo "github.com/darui3018823/discord.go"
 	"github.com/darui3018823/discord.go/bot"
 )
 
@@ -23,15 +25,35 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	client.Session().Identify.Intents = dgo.IntentsGuilds | dgo.IntentsGuildMessages | dgo.IntentsMessageContent
+	if err := client.SetPrefixes("!"); err != nil {
+		log.Fatal(err)
+	}
 	if err := client.Register(bot.Slash("ping", "Replies with pong", func(ctx *bot.Context) error {
 		return ctx.Reply("Pong!")
 	})); err != nil {
 		log.Fatal(err)
 	}
+	if err := client.RegisterPrefixCommands(bot.TextCommand("ping", func(ctx *bot.PrefixContext) error {
+		_, err := ctx.Reply("Pong!")
+		return err
+	})); err != nil {
+		log.Fatal(err)
+	}
+	heartbeat, err := bot.NewLoop(time.Minute, func(context.Context) error {
+		log.Print("background task tick")
+		return nil
+	}, bot.WithLoopName("example-heartbeat"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := client.StartLoop(heartbeat); err != nil {
+		log.Fatal(err)
+	}
 
 	// Set DISCORD_GUILD_ID during development for near-immediate guild command
 	// updates. Leave it empty to synchronize global commands.
-	if _, err := client.SyncCommands(ctx, applicationID, os.Getenv("DISCORD_GUILD_ID")); err != nil {
+	if _, err := client.SyncCommandDiff(ctx, applicationID, os.Getenv("DISCORD_GUILD_ID")); err != nil {
 		log.Fatal(err)
 	}
 	if err := client.Run(ctx); err != nil {

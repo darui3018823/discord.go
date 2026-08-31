@@ -16,6 +16,8 @@ used during releases.
 | Interactions and Webhook Events | Interaction models, response helpers, webhook event envelopes, signature verification |
 | Models | Guild, channel, message, user, role, application, entitlement, subscription, and audit-log types |
 | Extensibility | Custom HTTP clients, WebSocket dialers, loggers, raw events |
+| High-level bot framework | `bot.Bot`, commands, typed contexts, components, modals, prefix routing, checks, middleware, cooldowns, extensions, task loops, command diff sync |
+| High-level Voice framework | `voice.Player`, `voice.Queue`, `voice.PCMSource`, `voice.Receiver` |
 
 Typed helpers are preferred over low-level `Request*` methods. Raw REST access
 does not make private Discord client routes supported.

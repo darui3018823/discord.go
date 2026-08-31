@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/darui3018823/discord.go.svg)](https://pkg.go.dev/github.com/darui3018823/discord.go)
 
-discord.go is an experimental high-level Discord framework for Go. It embeds
+discord.go is a batteries-included Discord framework for Go. It embeds
 the proven REST, Gateway, interaction, state, and Voice implementation forked
 from [dgo](https://github.com/darui3018823/dgo), then adds an opinionated bot,
 command, component, task, and audio layer on top.
@@ -13,8 +13,11 @@ may import it with a `discord` alias when preferred.
 
 ## Highlights
 
-- High-level application-command router and middleware
-- Pure Go PCM/Opus Voice player and per-SSRC receiver
+- Slash, context-menu, autocomplete, component, modal, and prefix routing
+- Typed arguments, checks, permissions, cooldowns, middleware, and error scopes
+- Transactional Cog/extensions and lifecycle-managed task loops
+- Semantic command-diff synchronization with dry-run support
+- Pure Go PCM/Opus Voice source queue, volume, pause/resume/skip, FEC, and PLC
 - Discord API v10 REST and Gateway bindings
 - Gateway event handling, state tracking, and voice connections
 - DAVE end-to-end voice encryption support
@@ -57,7 +60,7 @@ func main() {
 	})); err != nil {
 		panic(err)
 	}
-	if _, err := client.SyncCommands(ctx, os.Getenv("DISCORD_APPLICATION_ID"), ""); err != nil {
+	if _, err := client.SyncCommandDiff(ctx, os.Getenv("DISCORD_APPLICATION_ID"), ""); err != nil {
 		panic(err)
 	}
 	if err := client.Run(ctx); err != nil {
@@ -90,6 +93,8 @@ private client routes are not supported.
 ## Documentation
 
 - [Getting started](docs/GettingStarted.md)
+- [High-level framework](docs/HighLevel.md)
+- [Voice framework](docs/VoiceFramework.md)
 - [Migration, compatibility, and deprecation policy](docs/Migration.md)
 - [Webhook Events and Application Identity Profiles](docs/WebhookEvents.md)
 - [v1.1.0 release notes](docs/releases/v1.1.0.md)

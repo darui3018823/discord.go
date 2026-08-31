@@ -1,6 +1,6 @@
-site_name: dgo
-site_author: dgo contributors
-site_url: https://darui3018823.github.io/dgo/
+site_name: discord.go
+site_author: discord.go contributors
+site_url: https://darui3018823.github.io/discord.go/
 repo_url: https://github.com/darui3018823/discord.go
 
 dev_addr: 0.0.0.0:8000
@@ -15,6 +15,8 @@ markdown_extensions:
 nav:
     - 'Home': 'index.md'
     - 'Getting Started': 'GettingStarted.md'
+    - 'High-Level Framework': 'HighLevel.md'
+    - 'Voice Framework': 'VoiceFramework.md'
     - 'API Inventory': 'API.md'
     - 'Migration': 'Migration.md'
     - 'Webhook Events and Application Identity Profiles': 'WebhookEvents.md'
