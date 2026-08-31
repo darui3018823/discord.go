@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"go/format"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -37,6 +39,22 @@ var modules = []module{
 }
 
 func main() {
+	interactive := flag.Bool("interactive", false, "prompt for optional live Discord test resources")
+	offline := flag.Bool("offline", false, "disable live Discord testing even when credentials are set")
+	flag.Parse()
+	if *interactive && *offline {
+		fmt.Fprintln(os.Stderr, "\nfulltest FAILED: -interactive and -offline cannot be combined")
+		os.Exit(2)
+	}
+	if *offline {
+		clearLiveEnvironment()
+	}
+	if *interactive {
+		if err := configureInteractive(os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "\nfulltest FAILED: interactive configuration: %v\n", err)
+			os.Exit(2)
+		}
+	}
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "\nfulltest FAILED: %v\n", err)
 		os.Exit(1)
@@ -55,10 +73,22 @@ func run() error {
 
 	liveEnabled := os.Getenv(liveTokenEnvironment) != ""
 	if liveEnabled {
-		guildEnabled := os.Getenv(liveGuildEnvironment) != ""
-		voiceEnabled := os.Getenv(liveVoiceEnvironment) != ""
+		guildID := os.Getenv(liveGuildEnvironment)
+		voiceChannelID := os.Getenv(liveVoiceEnvironment)
+		guildEnabled := guildID != ""
+		voiceEnabled := voiceChannelID != ""
 		if voiceEnabled && !guildEnabled {
 			return fmt.Errorf("%s requires %s", liveVoiceEnvironment, liveGuildEnvironment)
+		}
+		if guildEnabled {
+			if err := validateDiscordID(liveGuildEnvironment, guildID); err != nil {
+				return err
+			}
+		}
+		if voiceEnabled {
+			if err := validateDiscordID(liveVoiceEnvironment, voiceChannelID); err != nil {
+				return err
+			}
 		}
 		fmt.Printf(
 			"Live Discord E2E: enabled by %s (value hidden; command=%t, voice=%t)\n",
@@ -118,6 +148,141 @@ func run() error {
 		if err := runCommand(ctx, "live Discord connectivity", root, os.Environ(), "go", "test", "-count=1", "-v", "./e2e"); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func configureInteractive(input io.Reader, output io.Writer) error {
+	reader := bufio.NewReader(input)
+	fmt.Fprintln(output, "Interactive fulltest configuration")
+	fmt.Fprintf(output, "%s: %s\n", liveTokenEnvironment, configuredLabel(os.Getenv(liveTokenEnvironment)))
+	live, err := promptYesNo(reader, output, "Run live Discord E2E", false)
+	if err != nil {
+		return err
+	}
+	if !live {
+		clearLiveEnvironment()
+		fmt.Fprintln(output, "Live Discord E2E disabled for this run.")
+		return nil
+	}
+	if os.Getenv(liveTokenEnvironment) == "" {
+		return fmt.Errorf(
+			"%s is not set; configure it in the IDE or operating-system environment and restart the IDE if necessary (the token is never requested in the echoed Run console)",
+			liveTokenEnvironment,
+		)
+	}
+
+	guildID, err := promptEnvironmentValue(reader, output, "Test guild ID", os.Getenv(liveGuildEnvironment))
+	if err != nil {
+		return err
+	}
+	if guildID != "" {
+		if err := validateDiscordID(liveGuildEnvironment, guildID); err != nil {
+			return err
+		}
+	}
+	setOptionalEnvironment(liveGuildEnvironment, guildID)
+
+	voiceChannelID := ""
+	if guildID != "" {
+		voiceChannelID, err = promptEnvironmentValue(reader, output, "Standard Voice channel ID", os.Getenv(liveVoiceEnvironment))
+		if err != nil {
+			return err
+		}
+		if voiceChannelID != "" {
+			if err := validateDiscordID(liveVoiceEnvironment, voiceChannelID); err != nil {
+				return err
+			}
+		}
+	}
+	setOptionalEnvironment(liveVoiceEnvironment, voiceChannelID)
+	fmt.Fprintf(
+		output,
+		"Live mode selected (command=%t, voice=%t); token value remains hidden.\n",
+		guildID != "",
+		voiceChannelID != "",
+	)
+	return nil
+}
+
+func promptYesNo(reader *bufio.Reader, output io.Writer, label string, defaultValue bool) (bool, error) {
+	suffix := "[y/N]"
+	if defaultValue {
+		suffix = "[Y/n]"
+	}
+	fmt.Fprintf(output, "%s? %s: ", label, suffix)
+	value, err := readPromptLine(reader)
+	if err != nil {
+		return false, err
+	}
+	switch strings.ToLower(value) {
+	case "":
+		return defaultValue, nil
+	case "y", "yes":
+		return true, nil
+	case "n", "no":
+		return false, nil
+	default:
+		return false, fmt.Errorf("answer %q with yes or no", label)
+	}
+}
+
+func promptEnvironmentValue(reader *bufio.Reader, output io.Writer, label, current string) (string, error) {
+	currentLabel := "none"
+	if current != "" {
+		currentLabel = current
+	}
+	fmt.Fprintf(output, "%s [%s] (Enter keeps it, '-' clears it): ", label, currentLabel)
+	value, err := readPromptLine(reader)
+	if err != nil {
+		return "", err
+	}
+	switch value {
+	case "":
+		return current, nil
+	case "-":
+		return "", nil
+	default:
+		return value, nil
+	}
+}
+
+func readPromptLine(reader *bufio.Reader) (string, error) {
+	line, err := reader.ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", fmt.Errorf("read interactive input: %w", err)
+	}
+	if errors.Is(err, io.EOF) && line == "" {
+		return "", errors.New("interactive input closed")
+	}
+	return strings.TrimSpace(line), nil
+}
+
+func configuredLabel(value string) string {
+	if value == "" {
+		return "not configured"
+	}
+	return "configured (value hidden)"
+}
+
+func setOptionalEnvironment(key, value string) {
+	if value == "" {
+		_ = os.Unsetenv(key)
+		return
+	}
+	_ = os.Setenv(key, value)
+}
+
+func clearLiveEnvironment() {
+	_ = os.Unsetenv(liveTokenEnvironment)
+	_ = os.Unsetenv(liveGuildEnvironment)
+	_ = os.Unsetenv(liveVoiceEnvironment)
+}
+
+func validateDiscordID(name, value string) error {
+	id, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || id == 0 {
+		return fmt.Errorf("%s must be a non-zero Discord snowflake", name)
 	}
 	return nil
 }
