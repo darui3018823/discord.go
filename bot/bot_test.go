@@ -46,6 +46,13 @@ func interaction(name string, typeID dgo.ApplicationCommandType) *dgo.Interactio
 	}}
 }
 
+func TestRunWithShutdownValidatesTimeout(t *testing.T) {
+	framework := newTestBot(t)
+	if err := framework.RunWithShutdown(context.Background(), 0); err == nil {
+		t.Fatal("RunWithShutdown accepted a non-positive timeout")
+	}
+}
+
 func TestDispatchRunsMiddlewareInRegistrationOrder(t *testing.T) {
 	framework := newTestBot(t)
 	var calls []string

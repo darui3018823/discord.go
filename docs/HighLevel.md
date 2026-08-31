@@ -27,8 +27,10 @@ if err := client.Run(ctx); err != nil {
 }
 ```
 
-`Run` opens the Gateway and calls the full `Bot.Close` path after cancellation.
-For a bounded manual shutdown, use `CloseContext` with a deadline. It unloads
+`Run` opens the Gateway and calls the full `Bot.CloseContext` path after
+cancellation, using `DefaultShutdownTimeout`. Use `RunWithShutdown` to select a
+different bound, or call `CloseContext` directly during manual lifecycle
+management. Shutdown unloads
 extensions, finishes the current iteration of managed loops, cancels loops if
 the deadline expires, detaches dispatch handlers, and closes the Session.
 

@@ -9,9 +9,14 @@ import (
 	"log/slog"
 	"sort"
 	"sync"
+	"time"
 
 	dgo "github.com/darui3018823/discord.go"
 )
+
+// DefaultShutdownTimeout bounds the graceful cleanup performed by Run after
+// its parent context is cancelled.
+const DefaultShutdownTimeout = 10 * time.Second
 
 var (
 	// ErrDuplicateCommand is returned when a command with the same type and
@@ -377,14 +382,26 @@ func reportCommandError(handler ErrorHandler, ctx *Context, err error) {
 
 // Run opens the Gateway, waits for cancellation, and closes the Session.
 func (b *Bot) Run(ctx context.Context) error {
+	return b.RunWithShutdown(ctx, DefaultShutdownTimeout)
+}
+
+// RunWithShutdown opens the Gateway, waits for cancellation, and gives
+// managed extensions and loops up to shutdownTimeout to stop gracefully
+// before CloseContext cancels active loop iterations.
+func (b *Bot) RunWithShutdown(ctx context.Context, shutdownTimeout time.Duration) error {
 	if ctx == nil {
 		return errors.New("context must not be nil")
+	}
+	if shutdownTimeout <= 0 {
+		return errors.New("shutdown timeout must be positive")
 	}
 	if err := b.session.OpenWithContext(ctx); err != nil {
 		return err
 	}
 	<-ctx.Done()
-	return b.Close()
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	return b.CloseContext(shutdownCtx)
 }
 
 // Close gracefully stops managed resources and closes the underlying Session.
