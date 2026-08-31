@@ -118,7 +118,17 @@ Before opening a pull request:
 
 1. Open or reference an issue describing the change.
 2. Follow the repository's current naming and compatibility conventions.
-3. Run the root and nested-module verification described by CI.
+3. Run the full root, nested-module, coverage, and documentation verification:
+
+   ```sh
+   go run ./tools/cmd/fulltest
+   ```
+
+   The command needs no Discord credentials or live Discord access when
+   `test_bot_token` is absent. If a raw dedicated test-bot token is present in
+   that environment variable, it also runs the read-only live Discord REST,
+   Gateway, and high-level lifecycle E2E test. The token value is never
+   printed.
 4. Target the `master` branch.
 
 ## Attribution

@@ -6,12 +6,47 @@ application and guild without placing credentials in source control.
 
 ## Current validation status
 
-The 2026-08-31 local release-baseline run had no `DISCORD_TOKEN`,
-`DISCORD_BOT_TOKEN`, `DISCORD_APPLICATION_ID`, `DISCORD_GUILD_ID`, or
-`DISCORD_VOICE_CHANNEL_ID` environment variables. Live Gateway, Interaction,
-Voice UDP, and DAVE negotiation were therefore **not executed** in that run.
-All non-credentialed release checks passed; this is the remaining external
-validation boundary.
+An automated, read-only connectivity test is available in `e2e`. It checks
+bot authentication, current-application and Gateway discovery REST routes, a
+high-level command-sync dry run, Gateway READY dispatch, and graceful
+high-level Bot shutdown. Set a raw token for a dedicated test bot and run:
+
+```sh
+test_bot_token=YOUR_RAW_TEST_BOT_TOKEN go test -v ./e2e
+```
+
+PowerShell:
+
+```powershell
+$env:test_bot_token = "YOUR_RAW_TEST_BOT_TOKEN"
+go test -v ./e2e
+```
+
+The test skips when `test_bot_token` is absent or when `go test -short` is
+used. It never prints the token and does not create commands, send messages,
+or mutate Discord resources. For CI, expose the secret only to a single,
+dedicated E2E job so an operating-system matrix does not open simultaneous
+Gateway sessions.
+
+Contributors can run the complete pre-contribution suite with one command:
+
+```sh
+go run ./tools/cmd/fulltest
+```
+
+It always runs formatting, race tests, vet, coverage floors, and the strict
+documentation build for the root and nested modules. It temporarily removes
+`test_bot_token` from those subprocesses and runs the live E2E exactly once at
+the end when the token was present. Without the token, only that final live
+step is skipped.
+
+The token-only test cannot exercise user-driven interactions or Voice. Those
+cases still require the application, guild, channel, and consenting user setup
+below.
+
+On 2026-08-31, the automated test passed locally against a dedicated bot for
+all REST, command-plan, Gateway READY, and graceful-shutdown checks. No live
+Voice or user-driven interaction test was performed in that run.
 
 ## Test application setup
 
