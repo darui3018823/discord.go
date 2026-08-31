@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache-dependency-path: |
@@ -43,8 +43,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
       - name: Install documentation dependencies
@@ -74,8 +74,8 @@ jobs:
             mod: examples/voice_receive/go.mod
             sum: examples/voice_receive/go.sum
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.module.mod }}
           cache-dependency-path: ${{ matrix.module.sum }}
@@ -110,8 +110,8 @@ jobs:
             sum: examples/voice_receive/go.sum
             minimum: 40
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.module.mod }}
           cache-dependency-path: ${{ matrix.module.sum }}
@@ -146,8 +146,8 @@ jobs:
             mod: examples/voice_receive/go.mod
             sum: examples/voice_receive/go.sum
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.module.mod }}
           cache-dependency-path: ${{ matrix.module.sum }}
@@ -178,8 +178,8 @@ jobs:
             mod: examples/voice_receive/go.mod
             sum: examples/voice_receive/go.sum
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: ${{ matrix.module.mod }}
           cache-dependency-path: ${{ matrix.module.sum }}
