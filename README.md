@@ -95,6 +95,7 @@ private client routes are not supported.
 - [Getting started](docs/GettingStarted.md)
 - [High-level framework](docs/HighLevel.md)
 - [Voice framework](docs/VoiceFramework.md)
+- [Live Discord E2E validation](docs/E2E.md)
 - [Migration, compatibility, and deprecation policy](docs/Migration.md)
 - [Webhook Events and Application Identity Profiles](docs/WebhookEvents.md)
 - [v1.1.0 release notes](docs/releases/v1.1.0.md)

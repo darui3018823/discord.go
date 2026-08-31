@@ -17,6 +17,7 @@ nav:
     - 'Getting Started': 'GettingStarted.md'
     - 'High-Level Framework': 'HighLevel.md'
     - 'Voice Framework': 'VoiceFramework.md'
+    - 'Live E2E Validation': 'E2E.md'
     - 'API Inventory': 'API.md'
     - 'Migration': 'Migration.md'
     - 'Webhook Events and Application Identity Profiles': 'WebhookEvents.md'
