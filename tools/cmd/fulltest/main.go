@@ -19,6 +19,8 @@ import (
 
 const (
 	liveTokenEnvironment = "test_bot_token"
+	liveGuildEnvironment = "test_guild_id"
+	liveVoiceEnvironment = "test_voice_channel_id"
 	fullTestTimeout      = 30 * time.Minute
 )
 
@@ -53,7 +55,17 @@ func run() error {
 
 	liveEnabled := os.Getenv(liveTokenEnvironment) != ""
 	if liveEnabled {
-		fmt.Printf("Live Discord E2E: enabled by %s (value hidden)\n", liveTokenEnvironment)
+		guildEnabled := os.Getenv(liveGuildEnvironment) != ""
+		voiceEnabled := os.Getenv(liveVoiceEnvironment) != ""
+		if voiceEnabled && !guildEnabled {
+			return fmt.Errorf("%s requires %s", liveVoiceEnvironment, liveGuildEnvironment)
+		}
+		fmt.Printf(
+			"Live Discord E2E: enabled by %s (value hidden; command=%t, voice=%t)\n",
+			liveTokenEnvironment,
+			guildEnabled,
+			voiceEnabled,
+		)
 	} else {
 		fmt.Printf("Live Discord E2E: skipped; %s is not set\n", liveTokenEnvironment)
 	}

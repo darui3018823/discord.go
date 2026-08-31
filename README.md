@@ -126,8 +126,10 @@ Before opening a pull request:
 
    The command needs no Discord credentials or live Discord access when
    `test_bot_token` is absent. If a raw dedicated test-bot token is present in
-   that environment variable, it also runs the read-only live Discord REST,
-   Gateway, and high-level lifecycle E2E test. The token value is never
+   that environment variable, it also runs the live Discord REST, Gateway, and
+   high-level lifecycle E2E test. Explicit test guild and Voice channel IDs
+   additionally enable temporary command registration and generated-tone Voice
+   playback; see [CONTRIBUTING.md](CONTRIBUTING.md). The token value is never
    printed.
 4. Target the `master` branch.
 

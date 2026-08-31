@@ -23,10 +23,13 @@ go test -v ./e2e
 ```
 
 The test skips when `test_bot_token` is absent or when `go test -short` is
-used. It never prints the token and does not create commands, send messages,
-or mutate Discord resources. For CI, expose the secret only to a single,
-dedicated E2E job so an operating-system matrix does not open simultaneous
-Gateway sessions.
+used. With only that token it remains read-only. Set `test_guild_id` to add a
+temporary guild-command create/read/resync/delete lifecycle. Set
+`test_voice_channel_id` as well to join a standard Voice channel, play a
+generated low-volume one-second tone through the Opus queue, drain, and
+disconnect. The test never prints the token and does not send messages. For
+CI, expose the secrets only to a single, dedicated E2E job so an
+operating-system matrix does not open simultaneous Gateway or Voice sessions.
 
 Contributors can run the complete pre-contribution suite with one command:
 
@@ -40,13 +43,14 @@ documentation build for the root and nested modules. It temporarily removes
 the end when the token was present. Without the token, only that final live
 step is skipped.
 
-The token-only test cannot exercise user-driven interactions or Voice. Those
-cases still require the application, guild, channel, and consenting user setup
-below.
+The automated test cannot invoke its own slash command as a Discord user or
+confirm audibility from a second client. Those cases, Voice receive, and
+reconnect injection still require the consenting user setup below.
 
-On 2026-08-31, the automated test passed locally against a dedicated bot for
-all REST, command-plan, Gateway READY, and graceful-shutdown checks. No live
-Voice or user-driven interaction test was performed in that run.
+On 2026-08-31, the token-only automated test passed locally against a dedicated
+bot for all REST, command-plan, Gateway READY, and graceful-shutdown checks.
+The command-registration and Voice phases require the explicit IDs above and
+are reported separately in verbose test output.
 
 ## Test application setup
 

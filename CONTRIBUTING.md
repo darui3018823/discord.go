@@ -101,3 +101,71 @@ mkdocs build --clean --strict
 
 When changing a public API or example, update the corresponding documentation
 and verify the rendered links with this build.
+
+## Testing
+
+Run the complete contributor suite from the repository root:
+
+```sh
+go run ./tools/cmd/fulltest
+```
+
+No Discord credentials are required for formatting, race tests, vet, coverage,
+or documentation validation. The live package skips automatically when its
+environment is not configured.
+
+### Live Discord command and Voice test
+
+Use a dedicated test application and test guild. Do not use a production bot
+or a Voice channel with users who have not agreed to hear the one-second test
+tone. The bot needs these permissions in the configured guild:
+
+- View Channels
+- Connect and Speak in the selected standard Voice channel
+- the `bot` and `applications.commands` installation scopes
+
+Set a raw bot token and explicit test resource IDs:
+
+```text
+test_bot_token
+test_guild_id
+test_voice_channel_id
+```
+
+PowerShell:
+
+```powershell
+$env:test_bot_token = "YOUR_RAW_TEST_BOT_TOKEN"
+$env:test_guild_id = "YOUR_TEST_GUILD_ID"
+$env:test_voice_channel_id = "YOUR_STANDARD_VOICE_CHANNEL_ID"
+go run ./tools/cmd/fulltest
+```
+
+POSIX shells:
+
+```sh
+export test_bot_token=YOUR_RAW_TEST_BOT_TOKEN
+export test_guild_id=YOUR_TEST_GUILD_ID
+export test_voice_channel_id=YOUR_STANDARD_VOICE_CHANNEL_ID
+go run ./tools/cmd/fulltest
+```
+
+The live phase performs the following lifecycle:
+
+1. Authenticate through REST and receive Gateway READY.
+2. Register one uniquely named temporary guild slash command through the
+   high-level command-diff API.
+3. Fetch it, resynchronize it as unchanged, delete it, and verify deletion.
+4. Validate that the configured channel belongs to the configured guild and is
+   a standard Voice channel.
+5. Join self-deafened, encode and play a low-volume one-second 440 Hz stereo
+   tone through the high-level Opus queue, and drain the queue.
+6. Stop speaking, verify DAVE has no consecutive encryption failures,
+   disconnect, and verify the Voice transport was removed from the Session.
+
+Cleanup retries command deletion and Voice disconnection when an intermediate
+assertion fails. The test never prints the token. Setting only
+`test_bot_token` runs the read-only connectivity phase; adding
+`test_guild_id` enables command registration; adding all three variables runs
+the complete command and Voice lifecycle. See [the live E2E runbook](docs/E2E.md)
+for limitations and manual interaction/receive checks.
