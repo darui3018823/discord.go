@@ -53,9 +53,12 @@ func main() {
 
 	// Set DISCORD_GUILD_ID during development for near-immediate guild command
 	// updates. Leave it empty to synchronize global commands.
-	if _, err := client.SyncCommandDiff(ctx, applicationID, os.Getenv("DISCORD_GUILD_ID")); err != nil {
+	report, err := client.SyncCommandDiff(ctx, applicationID, os.Getenv("DISCORD_GUILD_ID"))
+	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("command sync: created=%d updated=%d deleted=%d unchanged=%d",
+		len(report.Created), len(report.Updated), len(report.Deleted), len(report.Unchanged))
 	if err := client.Run(ctx); err != nil {
 		log.Fatal(err)
 	}
