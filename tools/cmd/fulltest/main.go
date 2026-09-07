@@ -410,5 +410,5 @@ func pythonCommand() (string, error) {
 			return path, nil
 		}
 	}
-	return "", errors.New("Python was not found; install Python and requirements-docs.txt")
+	return "", errors.New("python was not found; install Python and requirements-docs.txt")
 }

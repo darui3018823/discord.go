@@ -246,7 +246,9 @@ func normalizeSyncCommand(command, desired *dgo.ApplicationCommand) {
 	if desired.NSFW == nil {
 		command.NSFW = nil
 	}
+	//lint:ignore SA1019 Preserve the legacy field while normalizing older commands.
 	if desired.DMPermission == nil {
+		//lint:ignore SA1019 Preserve the legacy field while normalizing older commands.
 		command.DMPermission = nil
 	}
 	if desired.Contexts == nil {
