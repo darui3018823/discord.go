@@ -14,6 +14,6 @@ require (
 	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/thomas-vilte/mls-go v1.6.0 // indirect
-	golang.org/x/crypto v0.56.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 )
