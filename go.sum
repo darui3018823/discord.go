@@ -1,7 +1,7 @@
 github.com/cloudflare/circl v1.6.5 h1:O64F26HEqNhznd/hrC5KZXVKYuKM2rx4deZDTc4ihQA=
 github.com/cloudflare/circl v1.6.5/go.mod h1:h5LNyxAc5nTue9DS5jT+48en2PSDYt3zdGnz5OstK6c=
-github.com/darui3018823/opus v1.4.1 h1:lyCmPkmcMwYu+f375utjfPG9b30r+l0X4GGHBUl7PDI=
-github.com/darui3018823/opus v1.4.1/go.mod h1:YHD24DJs1HzqHm0jUyM6p4Ev2GWas1t+5HmfUPA1oq4=
+github.com/darui3018823/opus v1.5.0 h1:4NzD8wBCGeXx7ZH5MyhaUx2xLzQDtnwhdN2sIG5Vc/4=
+github.com/darui3018823/opus v1.5.0/go.mod h1:YHD24DJs1HzqHm0jUyM6p4Ev2GWas1t+5HmfUPA1oq4=
 github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/thomas-vilte/mls-go v1.6.0 h1:HGxrRe0kRfEAXu7MtTemNzqGmC/758rfGkarhYGPOYg=
