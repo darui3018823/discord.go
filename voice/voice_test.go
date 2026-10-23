@@ -159,7 +159,7 @@ func TestReceiverUsesInbandFECForNewestMissingFrame(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := encoder.SetBitrate(18000); err != nil {
+	if err := encoder.SetBitrate(24000); err != nil {
 		t.Fatal(err)
 	}
 	encoder.SetSignalType(opus.SignalVoice)
