@@ -5,7 +5,7 @@ session using the public Discord Bot API.
 
 ## Requirements
 
-- Go 1.26.6 or newer
+- Go 1.27.3 or newer
 - A Discord application with a bot user
 - A bot token stored outside source control
 

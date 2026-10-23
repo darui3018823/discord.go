@@ -24,7 +24,7 @@ may import it with a `discord` alias when preferred.
 - Context-aware REST rate limiting and bounded retries
 - Structured logging with credential redaction
 - Safe defaults: no Gateway intents and no parsed mentions unless enabled
-- Go 1.26.6 or newer
+- Go 1.27.3 or newer
 
 ## Install
 
