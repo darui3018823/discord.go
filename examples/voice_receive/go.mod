@@ -6,7 +6,7 @@ replace github.com/darui3018823/discord.go => ../../
 
 require (
 	github.com/darui3018823/discord.go v1.0.0
-	github.com/pion/rtp v1.10.5
+	github.com/pion/rtp v1.10.6
 	github.com/pion/webrtc/v3 v3.3.6
 )
 
